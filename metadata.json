@@ -1,0 +1,8 @@
+{
+  "name": "Aura",
+  "description": "A digital sanctuary for language acquisition featuring a glassmorphic UI, AI-driven context, and spaced repetition logic.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
