@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { deckStatsService } from './deckStatsService';
 import type { DBDeck } from '../types';
 
 export const deckService = {
@@ -130,6 +131,9 @@ export const deckService = {
 
             if (insertCardsError) throw insertCardsError;
         }
+
+        // Increment clone count on original deck
+        await deckStatsService.incrementCloneCount(sourceDeckId);
 
         return newDeck;
     },

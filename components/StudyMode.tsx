@@ -1,44 +1,82 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Sparkles, ArrowRight, RotateCcw, CheckCircle } from 'lucide-react';
+import { X, Sparkles, ArrowRight, RotateCcw, CheckCircle, Trash2, Shuffle, Loader2 } from 'lucide-react';
 import { Deck, AnalysisResult } from '../types';
-import { analyzeSentence } from '../services/geminiService';
+import { analyzeSentence, generateDeck } from '../services/geminiService';
+import { deckService } from '../services/deckService';
+import { cardService } from '../services/cardService';
 import { progressService } from '../services/progressService';
+import { questService } from '../services/questService';
 import { useAuth } from '../contexts/AuthContext';
+import { useTranslation } from '../services/i18n';
+import DeckRatingModal from './DeckRatingModal';
 
 interface StudyModeProps {
   deck: Deck;
   onExit: () => void;
+  onDeckDeleted?: (deckId: string) => void;
+  onDeckRegenerated?: (newDeck: Deck) => void;
 }
 
 const LANGUAGE_NAMES: Record<string, string> = {
-  en: 'English', es: 'Spanish', fr: 'French', de: 'German',
-  it: 'Italian', pt: 'Portuguese', tr: 'Turkish', ja: 'Japanese',
-  ko: 'Korean', zh: 'Chinese', ru: 'Russian', ar: 'Arabic'
+  en: 'English', tr: 'Turkish', de: 'German', ru: 'Russian',
+  es: 'Spanish', fr: 'French', it: 'Italian', pt: 'Portuguese'
 };
 
-const StudyMode: React.FC<StudyModeProps> = ({ deck, onExit }) => {
+const StudyMode: React.FC<StudyModeProps> = ({ deck, onExit, onDeckDeleted, onDeckRegenerated }) => {
   const { profile, user } = useAuth();
+  const { t } = useTranslation();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [inputValue, setInputValue] = useState('');
   const [isRevealed, setIsRevealed] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const [isLoadingProgress, setIsLoadingProgress] = useState(true);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [hasRated, setHasRated] = useState(false);
 
   const currentCard = deck.cards?.[currentIndex];
   const inputRef = useRef<HTMLInputElement>(null);
+  const totalCards = deck.cards?.length || 0;
 
   // Get language names for AI
   const nativeLang = profile?.native_lang ? LANGUAGE_NAMES[profile.native_lang] || profile.native_lang : 'English';
   const targetLang = profile?.target_lang ? LANGUAGE_NAMES[profile.target_lang] || profile.target_lang : 'English';
 
+  // Resume from last studied card
   useEffect(() => {
-    if (!isRevealed && !isComplete) {
+    const loadLastPosition = async () => {
+      if (!user || !deck.cards || deck.cards.length === 0) {
+        setIsLoadingProgress(false);
+        return;
+      }
+
+      try {
+        // Get the deck progress to find which cards have been studied
+        const progress = await progressService.getDeckProgress(user.id, deck.id);
+        if (progress && progress.cardsStudied > 0 && progress.cardsStudied < totalCards) {
+          // Resume from the next unstudied card
+          setCurrentIndex(progress.cardsStudied);
+        }
+      } catch (error) {
+        console.error('Failed to load progress:', error);
+      } finally {
+        setIsLoadingProgress(false);
+      }
+    };
+
+    loadLastPosition();
+  }, [user, deck.id, deck.cards, totalCards]);
+
+  useEffect(() => {
+    if (!isRevealed && !isComplete && !isLoadingProgress) {
       inputRef.current?.focus();
     }
-  }, [currentIndex, isRevealed, isComplete]);
+  }, [currentIndex, isRevealed, isComplete, isLoadingProgress]);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -73,6 +111,8 @@ const StudyMode: React.FC<StudyModeProps> = ({ deck, onExit }) => {
     if (analysis && analysis.rating && user && currentCard) {
       try {
         await progressService.saveCardRating(user.id, currentCard.id, analysis.rating);
+        // Track quest progress
+        await questService.recordCardStudy(user.id, analysis.rating);
       } catch (error) {
         console.error('Failed to save rating:', error);
       }
@@ -86,6 +126,14 @@ const StudyMode: React.FC<StudyModeProps> = ({ deck, onExit }) => {
     } else {
       // Reached the end, show completion screen
       setIsComplete(true);
+      // Track deck completion for weekly quest
+      if (user) {
+        try {
+          await questService.recordDeckCompletion(user.id);
+        } catch (error) {
+          console.error('Failed to record deck completion:', error);
+        }
+      }
     }
   };
 
@@ -97,9 +145,79 @@ const StudyMode: React.FC<StudyModeProps> = ({ deck, onExit }) => {
     setIsComplete(false);
   };
 
-  const handleFinish = () => {
-    // TODO: Trigger regeneration of deck cards
-    onExit();
+  // Fresh Start: Regenerate deck with new words
+  const handleFreshStart = async () => {
+    if (!user || !profile || isRegenerating) return;
+
+    setIsRegenerating(true);
+    try {
+      // Extract topic from deck title (remove emoji and level)
+      const topic = deck.title.replace(/^[^\w]+/, '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+
+      // Generate new cards
+      const generatedCards = await generateDeck(
+        topic,
+        profile.target_lang || 'en',
+        profile.native_lang || 'en',
+        profile.proficiency_level || 'B1'
+      );
+
+      // Delete old cards and add new ones
+      await cardService.deleteCardsForDeck(deck.id);
+      const cardsToInsert = generatedCards.map((c: any) => ({
+        deck_id: deck.id,
+        word: c.word,
+        translation: c.translation,
+        type: c.type,
+        sample_sentence: c.sample_sentence,
+        ai_context: c.correct_sentence,
+      }));
+      const insertedCards = await cardService.createCards(cardsToInsert);
+
+      // Create updated deck object with real database IDs
+      const newDeck: Deck = {
+        ...deck,
+        progress: 0,
+        averageRating: 0,
+        cardsStudied: 0,
+        cards: insertedCards.map((dbCard: any, i: number) => ({
+          id: dbCard.id,
+          word: dbCard.word,
+          translation: dbCard.translation,
+          type: dbCard.type,
+          sample_sentence: dbCard.sample_sentence,
+          correct_sentence: generatedCards[i].correct_sentence,
+          difficulty: 'New' as const
+        }))
+      };
+
+      onDeckRegenerated?.(newDeck);
+      onExit();
+    } catch (error) {
+      console.error('Failed to regenerate deck:', error);
+      alert('Failed to regenerate deck. Please try again.');
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  // Finish: Delete deck and exit
+  const handleFinish = async () => {
+    if (!user || isDeleting) return;
+
+    if (!confirm(t('study.confirm_delete'))) return;
+
+    setIsDeleting(true);
+    try {
+      await deckService.deleteDeck(deck.id);
+      onDeckDeleted?.(deck.id);
+      onExit();
+    } catch (error) {
+      console.error('Failed to delete deck:', error);
+      alert('Failed to delete deck. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // Completion Screen
@@ -109,32 +227,104 @@ const StudyMode: React.FC<StudyModeProps> = ({ deck, onExit }) => {
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="glass rounded-[40px] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] p-12 text-center border border-white/50"
+          className="glass rounded-[40px] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] p-10 text-center border border-white/50"
         >
           <CheckCircle className="w-20 h-20 text-emerald-500 mx-auto mb-6" />
-          <h2 className="text-3xl font-bold tracking-tight mb-3">Session Complete!</h2>
-          <p className="text-gray-600 mb-8">You've completed all {deck.cards?.length || 0} cards in this deck.</p>
+          <h2 className="text-3xl font-bold tracking-tight mb-3">{t('study.session_complete')}</h2>
+          <p className="text-gray-600 mb-8">{t('study.completed_all')}</p>
 
-          <div className="flex gap-4">
+          {/* 3 Option Buttons */}
+          <div className="space-y-3">
+            {/* Start Over - Practice same cards again */}
             <button
               onClick={handleStartOver}
-              className="flex-1 bg-blue-500 text-white py-4 rounded-2xl font-bold text-sm uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg"
+              disabled={isRegenerating || isDeleting}
+              className="w-full bg-blue-500 text-white py-4 px-6 rounded-2xl font-bold text-sm uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg disabled:opacity-50 flex items-center justify-center gap-3"
             >
-              <RotateCcw className="inline mr-2" size={16} />
-              Start Over
+              <RotateCcw size={18} />
+              <span>{t('study.start_over')}</span>
             </button>
+
+            {/* Fresh Start - New words, same topic */}
+            <button
+              onClick={handleFreshStart}
+              disabled={isRegenerating || isDeleting}
+              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 px-6 rounded-2xl font-bold text-sm uppercase tracking-widest hover:from-purple-600 hover:to-pink-600 transition-all shadow-lg disabled:opacity-50 flex items-center justify-center gap-3"
+            >
+              {isRegenerating ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  <span>{t('study.generating_new')}</span>
+                </>
+              ) : (
+                <>
+                  <Shuffle size={18} />
+                  <span>{t('study.fresh_start')}</span>
+                </>
+              )}
+            </button>
+
+            {/* Finish - Delete deck */}
             <button
               onClick={handleFinish}
-              className="flex-1 bg-emerald-500 text-white py-4 rounded-2xl font-bold text-sm uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg"
+              disabled={isRegenerating || isDeleting}
+              className="w-full bg-gray-100 text-gray-600 py-4 px-6 rounded-2xl font-bold text-sm uppercase tracking-widest hover:bg-red-50 hover:text-red-600 transition-all border border-gray-200 disabled:opacity-50 flex items-center justify-center gap-3"
             >
-              <CheckCircle className="inline mr-2" size={16} />
-              Finish
+              {isDeleting ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  <span>{t('study.deleting')}</span>
+                </>
+              ) : (
+                <>
+                  <Trash2 size={18} />
+                  <span>{t('study.finish_delete')}</span>
+                </>
+              )}
             </button>
           </div>
-          <p className="text-xs text-gray-400 mt-6">
-            Start Over: Review the same cards | Finish: Generate new cards next time
-          </p>
+
+          {/* Descriptions */}
+          <div className="mt-6 text-xs text-gray-400 space-y-1">
+            <p><strong>{t('study.start_over')}</strong>: {t('study.start_over_desc')}</p>
+            <p><strong>{t('study.fresh_start')}</strong>: {t('study.fresh_start_desc')}</p>
+            <p><strong>{t('study.finish_delete')}</strong>: {t('study.finish_delete_desc')}</p>
+          </div>
         </motion.div>
+
+        {/* Rating Modal - Shows for any deck */}
+        <DeckRatingModal
+          isOpen={showRatingModal}
+          deckId={deck.id}
+          deckTitle={deck.title}
+          onClose={() => setShowRatingModal(false)}
+          onRated={() => setHasRated(true)}
+        />
+
+        {/* Rate This Deck Button - Shows if not rated yet */}
+        {!hasRated && (
+          <motion.button
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            onClick={() => setShowRatingModal(true)}
+            className="mt-4 text-sm text-blue-500 hover:text-blue-600 font-medium"
+          >
+            ⭐ {t('study.rate_deck')}
+          </motion.button>
+        )}
+      </div>
+    );
+  }
+
+  // Show loading while checking progress
+  if (isLoadingProgress) {
+    return (
+      <div className="w-full max-w-xl">
+        <div className="glass rounded-[40px] shadow-lg p-12 text-center border border-white/50">
+          <div className="animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
+          <p className="text-gray-600 font-medium">{t('study.loading_progress')}</p>
+        </div>
       </div>
     );
   }
@@ -142,8 +332,8 @@ const StudyMode: React.FC<StudyModeProps> = ({ deck, onExit }) => {
   if (!currentCard) {
     return (
       <div className="text-center p-12 glass rounded-[32px]">
-        <h2 className="text-xl font-bold">No cards available</h2>
-        <button onClick={onExit} className="mt-4 text-blue-500 font-bold">Return to Dashboard</button>
+        <h2 className="text-xl font-bold">{t('study.no_cards')}</h2>
+        <button onClick={onExit} className="mt-4 text-blue-500 font-bold">{t('study.return_dashboard')}</button>
       </div>
     );
   }
@@ -162,23 +352,32 @@ const StudyMode: React.FC<StudyModeProps> = ({ deck, onExit }) => {
         layout
         transition={{ type: "spring", bounce: 0.1, duration: 0.6 }}
         className="glass rounded-[40px] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] p-8 md:p-12 overflow-hidden flex flex-col items-center border border-white/50"
+        style={{ perspective: 1200 }}
       >
-        {/* Progress Indicator */}
-        <div className="w-32 h-1 bg-black/5 rounded-full mb-12 overflow-hidden">
-          <motion.div
-            className="h-full bg-blue-500"
-            initial={false}
-            animate={{ width: `${((currentIndex + 1) / (deck.cards?.length || 1)) * 100}%` }}
-          />
+        {/* Card Counter & Progress */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="text-2xl font-bold text-gray-800 mb-2">
+            {currentIndex + 1} <span className="text-gray-400">/</span> {totalCards}
+          </div>
+          <div className="w-48 h-2 bg-black/5 rounded-full overflow-hidden">
+            <motion.div
+              className="h-full bg-gradient-to-r from-blue-500 to-purple-500"
+              initial={false}
+              animate={{ width: `${((currentIndex + 1) / totalCards) * 100}%` }}
+            />
+          </div>
         </div>
 
+        {/* 3D Flip Animation Container */}
         <AnimatePresence mode="wait">
           {!isRevealed ? (
             <motion.div
               key="front"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
+              initial={{ rotateY: 90, opacity: 0 }}
+              animate={{ rotateY: 0, opacity: 1 }}
+              exit={{ rotateY: -90, opacity: 0 }}
+              transition={{ duration: 0.4, ease: "easeInOut" }}
+              style={{ transformStyle: "preserve-3d", backfaceVisibility: "hidden" }}
               className="w-full space-y-8 flex flex-col items-center"
             >
               <div className="text-center">
@@ -196,7 +395,7 @@ const StudyMode: React.FC<StudyModeProps> = ({ deck, onExit }) => {
               <div className="w-full space-y-4">
                 <div className="bg-white/40 rounded-2xl p-6 border border-white/50">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block mb-3">
-                    Example (Context)
+                    {t('study.example')}
                   </span>
                   <p className="text-lg font-medium text-gray-700 text-center">
                     {currentCard.sample_sentence}
@@ -204,27 +403,48 @@ const StudyMode: React.FC<StudyModeProps> = ({ deck, onExit }) => {
                 </div>
 
                 <p className="text-center text-sm text-gray-500 italic">
-                  Write a sentence using <strong>{currentCard.word}</strong>
+                  {t('study.write_sentence')} <strong>{currentCard.word}</strong>
                 </p>
 
-                <form onSubmit={handleSubmit} className="relative">
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    placeholder={`Type your sentence using "${currentCard.word}"...`}
-                    className="w-full bg-transparent border-b-2 border-black/5 py-4 px-2 text-xl font-medium focus:outline-none focus:border-blue-500 transition-colors font-mono"
-                  />
+                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                  <div className="relative">
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      placeholder={`Type your sentence using "${currentCard.word}"...`}
+                      className="w-full bg-transparent border-b-2 border-black/5 py-4 px-2 pr-12 text-xl font-medium focus:outline-none focus:border-blue-500 transition-colors font-mono"
+                    />
+                    {/* Inline submit arrow for quick submission */}
+                    <button
+                      type="submit"
+                      disabled={isLoading || !inputValue.trim()}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-300 hover:text-blue-500 transition-colors disabled:opacity-30 z-10"
+                    >
+                      {isLoading ? (
+                        <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full" />
+                      ) : (
+                        <ArrowRight size={24} />
+                      )}
+                    </button>
+                  </div>
+                  {/* Full-width submit button for better mobile UX */}
                   <button
                     type="submit"
                     disabled={isLoading || !inputValue.trim()}
-                    className="absolute right-2 bottom-4 text-gray-300 hover:text-blue-500 transition-colors disabled:opacity-30"
+                    className="w-full bg-blue-500 text-white py-3 rounded-xl font-bold text-sm uppercase tracking-widest hover:bg-blue-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {isLoading ? (
-                      <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full" />
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>{t('common.loading')}</span>
+                      </>
                     ) : (
-                      <ArrowRight size={24} />
+                      <>
+                        <Sparkles size={16} />
+                        <span>{t('study.ai_analysis')}</span>
+                      </>
                     )}
                   </button>
                 </form>
@@ -233,18 +453,21 @@ const StudyMode: React.FC<StudyModeProps> = ({ deck, onExit }) => {
           ) : (
             <motion.div
               key="back"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ rotateY: -90, opacity: 0 }}
+              animate={{ rotateY: 0, opacity: 1 }}
+              exit={{ rotateY: 90, opacity: 0 }}
+              transition={{ duration: 0.4, ease: "easeInOut" }}
+              style={{ transformStyle: "preserve-3d", backfaceVisibility: "hidden" }}
               className="w-full space-y-8"
             >
               <div className="space-y-6">
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block mb-2">Correct Sentence</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block mb-2">{t('study.correct_sentence')}</span>
                   <p className="text-xl font-medium text-emerald-600">{currentCard.correct_sentence || currentCard.sample_sentence}</p>
                 </div>
 
                 <div className="p-6 bg-white/30 rounded-2xl border border-white/50">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block mb-2">Your Submission</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block mb-2">{t('study.your_submission')}</span>
                   <p className="text-lg font-mono text-gray-700">{inputValue}</p>
                 </div>
 
@@ -257,7 +480,7 @@ const StudyMode: React.FC<StudyModeProps> = ({ deck, onExit }) => {
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-2">
                         <Sparkles className="text-blue-500" size={20} />
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-blue-500">AI Analysis</span>
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-blue-500">{t('study.ai_analysis')}</span>
                       </div>
 
                       {/* Star Rating Display */}
@@ -304,13 +527,13 @@ const StudyMode: React.FC<StudyModeProps> = ({ deck, onExit }) => {
                   className="bg-orange-500 text-white py-4 rounded-2xl text-[11px] font-bold uppercase tracking-widest hover:bg-orange-600 active:scale-95 transition-all shadow-lg flex items-center justify-center gap-2"
                 >
                   <RotateCcw size={16} />
-                  Try Again
+                  {t('study.try_again')}
                 </button>
                 <button
                   onClick={handleNext}
                   className="bg-blue-500 text-white py-4 rounded-2xl text-[11px] font-bold uppercase tracking-widest hover:bg-blue-600 active:scale-95 transition-all shadow-lg flex items-center justify-center gap-2"
                 >
-                  Next
+                  {t('study.next')}
                   <ArrowRight size={16} />
                 </button>
               </div>

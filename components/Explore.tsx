@@ -1,16 +1,29 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Sparkles, Plus, Globe, Filter, X, Loader2, Copy } from 'lucide-react';
+import { Search, Sparkles, Plus, Globe, Filter, X, Loader2, Copy, Star, Users, TrendingUp, Clock } from 'lucide-react';
 import { generateDeck } from '../services/geminiService';
 import { deckService } from '../services/deckService';
 import { cardService } from '../services/cardService';
+import { deckStatsService, DeckStats } from '../services/deckStatsService';
 import { useAuth } from '../contexts/AuthContext';
+import { useTranslation } from '../services/i18n';
 import { Deck, Card } from '../types';
 
 interface ExploreProps {
   onAddDeck: (deck: Deck) => void;
 }
+
+const LANGUAGES = [
+  { code: 'en', name: 'English' },
+  { code: 'tr', name: 'Turkish' },
+  { code: 'de', name: 'German' },
+  { code: 'ru', name: 'Russian' },
+  { code: 'es', name: 'Spanish' },
+  { code: 'fr', name: 'French' },
+  { code: 'it', name: 'Italian' },
+  { code: 'pt', name: 'Portuguese' },
+];
 
 const FEATURED_DECKS = [
   { id: 'f1', title: 'Kyoto Cafe Phrases', lang: 'Japanese', count: 45, author: 'Sato M.', gradient: 'linear-gradient(135deg, #FF6B6B, #FFD93D)' },
@@ -21,6 +34,7 @@ const FEATURED_DECKS = [
 
 const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
   const { user, profile } = useAuth();
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
@@ -29,6 +43,7 @@ const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
   const [language, setLanguage] = useState(profile?.target_lang || '');
   const [sourceLanguage, setSourceLanguage] = useState(profile?.native_lang || 'English');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isPublic, setIsPublic] = useState(false);
 
   // Manual deck creation states
   const [manualTitle, setManualTitle] = useState('');
@@ -47,13 +62,22 @@ const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
   // Community decks
   const [communityDecks, setCommunityDecks] = useState<any[]>([]);
   const [loadingCommunity, setLoadingCommunity] = useState(true);
+  const [deckStats, setDeckStats] = useState<Map<string, DeckStats>>(new Map());
+  const [activeCategory, setActiveCategory] = useState<'all' | 'popular' | 'new'>('all');
 
-  // Load community decks
+  // Load community decks and stats
   useEffect(() => {
     const loadCommunityDecks = async () => {
       try {
         const publicDecks = await deckService.getPublicDecks();
         setCommunityDecks(publicDecks);
+
+        // Load stats for all decks
+        if (publicDecks.length > 0) {
+          const deckIds = publicDecks.map((d: any) => d.id);
+          const stats = await deckStatsService.getMultipleDeckStats(deckIds);
+          setDeckStats(stats);
+        }
       } catch (error) {
         console.error('Error loading community decks:', error);
       } finally {
@@ -82,7 +106,7 @@ const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
         title: topic.charAt(0).toUpperCase() + topic.slice(1),
         source_lang: sourceLanguage,
         target_lang: language,
-        is_public: false,
+        is_public: isPublic,
         cover_gradient: gradient,
       });
 
@@ -114,9 +138,15 @@ const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
 
       onAddDeck(localDeck);
       setIsAIModalOpen(false);
+      // Reload community decks if marked public
+      if (isPublic) {
+        const publicDecks = await deckService.getPublicDecks();
+        setCommunityDecks(publicDecks);
+      }
       // Reset form
       setTopic('');
       setLanguage('');
+      setIsPublic(false);
       setSourceLanguage('English');
     } catch (error) {
       console.error('Generation error:', error);
@@ -128,12 +158,12 @@ const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
 
   const handleManualCreate = async () => {
     if (!manualTitle || !manualTargetLang || !user) return;
-    if (manualCards.length !== 10) {
-      alert("Please create exactly 10 cards.");
+    if (manualCards.length < 3) {
+      alert("Please create at least 3 cards.");
       return;
     }
     if (manualCards.some(c => !c.word || !c.translation || !c.sample_sentence || !c.correct_sentence)) {
-      alert("Please fill in all fields for all 10 cards.");
+      alert("Please fill in all fields for all cards.");
       return;
     }
 
@@ -212,7 +242,7 @@ const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
   };
 
   const addCardField = () => {
-    if (manualCards.length < 10) {
+    if (manualCards.length < 20) {
       setManualCards([...manualCards, { word: '', translation: '', type: 'Noun', sample_sentence: '', correct_sentence: '' }]);
     }
   };
@@ -237,31 +267,31 @@ const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
   return (
     <div className="space-y-12">
       <header className="flex flex-col items-center gap-6">
-        <h1 className="text-4xl font-semibold tracking-tight">Expand Your Horizons</h1>
+        <h1 className="text-4xl font-semibold tracking-tight">{t('explore.title')}</h1>
         <div className="w-full max-w-2xl relative">
           <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
           <input
             type="text"
-            placeholder="Search for a language, topic, or deck..."
+            placeholder={t('explore.search_placeholder')}
             className="w-full glass py-6 pl-16 pr-8 rounded-[32px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-lg shadow-xl"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         <div className="flex gap-4">
-          <FilterChip icon={<Globe size={14} />} label="All Languages" />
-          <FilterChip icon={<Sparkles size={14} />} label="AI Curated" />
-          <FilterChip icon={<Filter size={14} />} label="Advanced" />
+          <FilterChip icon={<Globe size={14} />} label={t('explore.all_languages')} />
+          <FilterChip icon={<Sparkles size={14} />} label={t('explore.ai_curated')} />
+          <FilterChip icon={<Filter size={14} />} label={t('explore.advanced')} />
         </div>
       </header>
 
       <section>
         <div className="flex justify-between items-end mb-8">
           <div>
-            <h2 className="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-2">Community Favorites</h2>
-            <h3 className="text-2xl font-bold">Trending Decks</h3>
+            <h2 className="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-2">{t('explore.community_favorites')}</h2>
+            <h3 className="text-2xl font-bold">{t('explore.trending')}</h3>
           </div>
-          <button className="text-blue-500 text-sm font-bold hover:underline">View All</button>
+          <button className="text-blue-500 text-sm font-bold hover:underline">{t('explore.view_all')}</button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -292,9 +322,9 @@ const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
           <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center mb-6">
             <Sparkles className="text-blue-400" size={24} />
           </div>
-          <h2 className="text-3xl font-bold mb-4 tracking-tight">Need something specific?</h2>
+          <h2 className="text-3xl font-bold mb-4 tracking-tight">{t('explore.need_specific')}</h2>
           <p className="text-gray-400 mb-8 leading-relaxed">
-            Our AI engine can build a custom deck for any niche. "Medical French," "Japanese for Surfers," or "Corporate Mandarin."
+            {t('explore.ai_description')}
           </p>
           <div className="flex gap-4">
             <button
@@ -302,14 +332,14 @@ const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
               className="flex-1 bg-white text-[#1a1a1a] px-6 py-4 rounded-2xl font-bold text-sm tracking-wide hover:scale-105 active:scale-95 transition-all shadow-xl flex items-center justify-center gap-2"
             >
               <Sparkles size={18} />
-              AI Generate
+              {t('explore.ai_generate')}
             </button>
             <button
               onClick={() => setIsManualModalOpen(true)}
               className="flex-1 bg-blue-500 text-white px-6 py-4 rounded-2xl font-bold text-sm tracking-wide hover:scale-105 active:scale-95 transition-all shadow-xl flex items-center justify-center gap-2"
             >
               <Plus size={18} />
-              Create Manually
+              {t('explore.create_manually')}
             </button>
           </div>
         </div>
@@ -357,23 +387,39 @@ const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
                 </div>
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-widest text-white/40 block mb-2">Target Language</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Italian"
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                  <select
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-white"
                     value={language}
                     onChange={(e) => setLanguage(e.target.value)}
-                  />
+                  >
+                    <option value="" className="bg-gray-800 text-white">Select language...</option>
+                    {LANGUAGES.map((lang) => (
+                      <option key={lang.code} value={lang.code} className="bg-gray-800 text-white">{lang.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-widest text-white/40 block mb-2">Your Native Language</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. English"
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                  <select
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-white"
                     value={sourceLanguage}
                     onChange={(e) => setSourceLanguage(e.target.value)}
-                  />
+                  >
+                    {LANGUAGES.map((lang) => (
+                      <option key={lang.code} value={lang.code} className="bg-gray-800 text-white">{lang.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isPublic}
+                      onChange={(e) => setIsPublic(e.target.checked)}
+                      className="w-5 h-5 rounded accent-blue-500"
+                    />
+                    <span className="text-sm text-white/80">Share publicly (visible to all users)</span>
+                  </label>
                 </div>
                 <button
                   disabled={isGenerating || !topic || !language}
@@ -424,7 +470,7 @@ const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
 
               <div className="mb-8">
                 <h3 className="text-2xl font-bold tracking-tight mb-2">Create Manual Deck</h3>
-                <p className="text-white/40 text-sm">Create your own custom deck with exactly 10 cards.</p>
+                <p className="text-white/40 text-sm">Create your own custom deck with at least 3 cards.</p>
               </div>
 
               <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-4">
@@ -442,13 +488,16 @@ const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
                   </div>
                   <div>
                     <label className="text-[10px] font-bold uppercase tracking-widest text-white/40 block mb-2">Target Language</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Japanese"
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    <select
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white"
                       value={manualTargetLang}
                       onChange={(e) => setManualTargetLang(e.target.value)}
-                    />
+                    >
+                      <option value="" className="bg-gray-800 text-white">Select language...</option>
+                      {LANGUAGES.map((lang) => (
+                        <option key={lang.code} value={lang.code} className="bg-gray-800 text-white">{lang.name}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
@@ -467,8 +516,8 @@ const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
                 {/* Cards */}
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <h4 className="text-lg font-bold">Cards ({manualCards.length}/10)</h4>
-                    {manualCards.length < 10 && (
+                    <h4 className="text-lg font-bold">Cards ({manualCards.length})</h4>
+                    {manualCards.length < 20 && (
                       <button
                         onClick={addCardField}
                         className="text-blue-400 hover:text-blue-300 text-sm flex items-center gap-1"
@@ -542,7 +591,7 @@ const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
               </div>
 
               <button
-                disabled={isCreatingManual || !manualTitle || !manualTargetLang || manualCards.length !== 10}
+                disabled={isCreatingManual || !manualTitle || !manualTargetLang || manualCards.length < 3}
                 onClick={handleManualCreate}
                 className="w-full bg-blue-500 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-blue-500/20 mt-6"
               >
@@ -554,7 +603,7 @@ const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
                 ) : (
                   <>
                     <Plus size={20} />
-                    Create Deck ({manualCards.length}/10 cards)
+                    Create Deck ({manualCards.length} cards)
                   </>
                 )}
               </button>
@@ -565,69 +614,158 @@ const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
 
       {/* Community Decks Section */}
       <section className="mt-16">
-        <div className="flex justify-between items-end mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-8">
           <div>
-            <h2 className="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-2">Community Library</h2>
-            <h3 className="text-2xl font-bold">Public Decks</h3>
+            <h2 className="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-2">{t('explore.community_library')}</h2>
+            <h3 className="text-2xl font-bold">{t('explore.public_decks')}</h3>
+          </div>
+
+          {/* Category Tabs */}
+          <div className="flex gap-2 glass rounded-full p-1">
+            <button
+              onClick={() => setActiveCategory('all')}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-1.5 ${activeCategory === 'all' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                }`}
+            >
+              <Globe size={14} />
+              {t('explore.tab_all')}
+            </button>
+            <button
+              onClick={() => setActiveCategory('popular')}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-1.5 ${activeCategory === 'popular' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                }`}
+            >
+              <TrendingUp size={14} />
+              {t('explore.tab_popular')}
+            </button>
+            <button
+              onClick={() => setActiveCategory('new')}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-1.5 ${activeCategory === 'new' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                }`}
+            >
+              <Clock size={14} />
+              {t('explore.tab_new')}
+            </button>
           </div>
         </div>
 
         {loadingCommunity ? (
           <div className="text-center py-12">
-            <p className="text-gray-400 text-sm uppercase tracking-widest">Loading community decks...</p>
+            <Loader2 className="animate-spin mx-auto mb-3 text-gray-400" size={32} />
+            <p className="text-gray-400 text-sm uppercase tracking-widest">{t('explore.loading_community')}</p>
           </div>
         ) : communityDecks.length === 0 ? (
           <div className="text-center py-12 glass rounded-[32px] p-8">
-            <p className="text-gray-600 font-medium mb-2">No public decks yet</p>
-            <p className="text-gray-400 text-sm">Be the first to create a public deck!</p>
+            <p className="text-gray-600 font-medium mb-2">{t('explore.no_public')}</p>
+            <p className="text-gray-400 text-sm">{t('explore.be_first')}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {communityDecks.map((deck) => (
-              <motion.div
-                key={deck.id}
-                whileHover={{ scale: 1.02 }}
-                className="glass overflow-hidden rounded-[32px] group cursor-pointer shadow-sm border border-white/40"
-              >
-                <div className="h-40 relative" style={{ background: deck.cover_gradient }}>
-                  <div className="absolute inset-0 bg-black/5 group-hover:bg-transparent transition-colors" />
-                </div>
-                <div className="p-6">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-blue-500 mb-1 block">{deck.target_lang}</span>
-                  <h4 className="font-bold text-lg mb-3 tracking-tight">{deck.title}</h4>
+            {(() => {
+              // Sort decks based on category
+              let sortedDecks = [...communityDecks];
 
-                  {/* Creator Info */}
-                  <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-200">
-                    <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-blue-400 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
-                      {deck.profiles?.avatar_url ? (
-                        <img src={deck.profiles.avatar_url} alt={deck.profiles.username} className="w-full h-full object-cover" />
-                      ) : (
-                        deck.profiles?.username?.charAt(0).toUpperCase() || '?'
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-gray-700">
-                        {deck.profiles?.username || 'Anonymous'}
-                      </p>
-                      <p className="text-[10px] text-gray-400">
-                        {new Date(deck.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
+              if (activeCategory === 'popular') {
+                sortedDecks.sort((a, b) => {
+                  const statsA = deckStats.get(a.id);
+                  const statsB = deckStats.get(b.id);
+                  return (statsB?.cloneCount || 0) - (statsA?.cloneCount || 0);
+                });
+              } else if (activeCategory === 'new') {
+                sortedDecks.sort((a, b) =>
+                  new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                );
+              }
 
-                  <div className="flex justify-between items-center">
-                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Public Deck</p>
-                    <button
-                      onClick={() => handleCloneDeck(deck.id)}
-                      className="bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-blue-600 transition-all flex items-center gap-1"
-                    >
-                      <Copy size={14} />
-                      Clone
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
+              return sortedDecks.map((deck) => {
+                const stats = deckStats.get(deck.id);
+                const cloneLabel = stats ? deckStatsService.formatCloneCount(stats.cloneCount) : null;
+                const avgRating = stats?.avgRating || 0;
+                const ratingCount = stats?.ratingCount || 0;
+
+                return (
+                  <motion.div
+                    key={deck.id}
+                    whileHover={{ scale: 1.02 }}
+                    className="glass overflow-hidden rounded-[32px] group cursor-pointer shadow-sm border border-white/40"
+                  >
+                    <div className="h-36 relative" style={{ background: deck.cover_gradient }}>
+                      <div className="absolute inset-0 bg-black/5 group-hover:bg-transparent transition-colors" />
+
+                      {/* Stats Badges */}
+                      <div className="absolute top-3 right-3 flex gap-2">
+                        {cloneLabel && (
+                          <div className="bg-white/90 backdrop-blur-sm px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm">
+                            <Users size={12} className="text-blue-500" />
+                            <span className="text-xs font-bold text-gray-700">{cloneLabel}</span>
+                          </div>
+                        )}
+                        {ratingCount > 0 && (
+                          <div className="bg-white/90 backdrop-blur-sm px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm">
+                            <Star size={12} className="text-yellow-500 fill-yellow-500" />
+                            <span className="text-xs font-bold text-gray-700">{avgRating.toFixed(1)}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="p-5">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-blue-500 mb-1 block">
+                        {LANGUAGES.find(l => l.code === deck.target_lang)?.name || deck.target_lang}
+                      </span>
+                      <h4 className="font-bold text-lg mb-3 tracking-tight line-clamp-1">{deck.title}</h4>
+
+                      {/* Creator Info */}
+                      <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+                        <div className="w-7 h-7 rounded-full overflow-hidden bg-gradient-to-br from-blue-400 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
+                          {deck.profiles?.avatar_url ? (
+                            <img src={deck.profiles.avatar_url} alt={deck.profiles.username} className="w-full h-full object-cover" />
+                          ) : (
+                            deck.profiles?.username?.charAt(0).toUpperCase() || '?'
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-gray-700 truncate">
+                            {deck.profiles?.username || 'Anonymous'}
+                          </p>
+                          <p className="text-[10px] text-gray-400">
+                            {new Date(deck.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-center">
+                        {/* Rating Display */}
+                        <div className="flex items-center gap-1">
+                          {ratingCount > 0 ? (
+                            <>
+                              {[1, 2, 3, 4, 5].map(star => (
+                                <Star
+                                  key={star}
+                                  size={12}
+                                  className={star <= Math.round(avgRating) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-200'}
+                                />
+                              ))}
+                              <span className="text-[10px] text-gray-400 ml-1">({ratingCount})</span>
+                            </>
+                          ) : (
+                            <span className="text-[10px] text-gray-400">{t('explore.no_rating')}</span>
+                          )}
+                        </div>
+
+                        <button
+                          onClick={() => handleCloneDeck(deck.id)}
+                          className="bg-blue-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-blue-600 transition-all flex items-center gap-1"
+                        >
+                          <Copy size={12} />
+                          {t('explore.clone')}
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              });
+            })()}
           </div>
         )}
       </section>

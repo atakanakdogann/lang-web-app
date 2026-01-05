@@ -17,6 +17,18 @@ export const cardService = {
     },
 
     /**
+     * Delete all cards for a specific deck
+     */
+    async deleteCardsForDeck(deckId: string) {
+        const { error } = await supabase
+            .from('cards')
+            .delete()
+            .eq('deck_id', deckId);
+
+        if (error) throw error;
+    },
+
+    /**
      * Create a new card
      */
     async createCard(card: Omit<DBCard, 'id' | 'created_at'>) {

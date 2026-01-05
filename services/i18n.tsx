@@ -1,0 +1,551 @@
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+
+// Translation strings for English and Turkish
+const translations: Record<string, Record<string, string>> = {
+    en: {
+        // Onboarding
+        'onboarding.native_title': "What's your native language?",
+        'onboarding.native_subtitle': "This helps us provide better translations",
+        'onboarding.target_title': "What do you want to learn?",
+        'onboarding.target_subtitle': "You speak",
+        'onboarding.level_title': "What's your level?",
+        'onboarding.level_subtitle': "Be honest - we'll customize your experience",
+        'onboarding.interests_title': "What topics interest you?",
+        'onboarding.interests_subtitle': "Select your interests to personalize your decks",
+        'onboarding.minimum': "minimum",
+        'onboarding.continue': "Continue",
+        'onboarding.back': "Back",
+        'onboarding.start_learning': "Start Learning",
+        'onboarding.saving': "Saving...",
+
+        // Dashboard
+        'dashboard.title': "Your Sanctuary",
+        'dashboard.journey': "YOUR LANGUAGE JOURNEY",
+        'dashboard.starter_decks': "Starter Decks",
+        'dashboard.your_interests': "Your Interests",
+        'dashboard.add_premade': "Add pre-made decks for your level",
+        'dashboard.your_decks': "Your Decks",
+        'dashboard.no_decks': "No decks yet",
+        'dashboard.no_decks_hint': "Head to Explore to generate your first deck!",
+        'dashboard.loading_decks': "Loading your decks...",
+        'dashboard.add_deck': "Add Deck",
+        'dashboard.added': "Added",
+        'dashboard.creating': "Creating...",
+        'dashboard.cards': "cards",
+        'dashboard.words': "words",
+        'dashboard.words_learned': "Words Learned",
+        'dashboard.accuracy': "Accuracy",
+        'dashboard.streak': "Streak",
+        'dashboard.daily_quests': "Daily Quests",
+        'dashboard.review_cards': "Review 20 cards",
+        'dashboard.accuracy_rate': "90% Accuracy Rate",
+        'dashboard.maintain_streak': "Maintain Streak",
+        'dashboard.completed': "COMPLETED",
+        'dashboard.current': "CURRENT",
+        'dashboard.day_of': "DAY OF",
+
+        // Quests
+        'quests.title': "Your Quests",
+        'quests.completed': "completed",
+        'quests.earned': "earned today",
+        'quests.today': "Today",
+        'quests.daily': "Daily Quests",
+        'quests.weekly': "Weekly Quests",
+        'quests.resets_midnight': "Resets at midnight",
+        'quests.resets_monday': "Resets Monday",
+
+        // Rating
+        'rating.how_was': "How was this deck?",
+        'rating.tap_to_rate': "Tap a star to rate",
+        'rating.terrible': "Terrible",
+        'rating.poor': "Poor",
+        'rating.okay': "Okay",
+        'rating.good': "Good",
+        'rating.excellent': "Excellent!",
+        'rating.skip': "Skip",
+        'rating.submit': "Submit",
+        'rating.submitting': "Submitting...",
+        'rating.thank_you': "Thank You!",
+        'rating.feedback_helps': "Your feedback helps others find great decks.",
+
+        // Study Mode
+        'study.card': "Card",
+        'study.of': "of",
+        'study.example': "Example (Context)",
+        'study.write_sentence': "Write a sentence using",
+        'study.type_sentence': "Type your sentence using",
+        'study.correct_sentence': "Correct Sentence",
+        'study.your_submission': "Your Submission",
+        'study.ai_analysis': "AI Analysis",
+        'study.try_again': "Try Again",
+        'study.next': "Next",
+        'study.session_complete': "Session Complete!",
+        'study.completed_all': "You've completed all cards in this deck.",
+        'study.start_over': "Start Over",
+        'study.start_over_desc': "Practice the same words again",
+        'study.fresh_start': "Fresh Start",
+        'study.fresh_start_desc': "New words, same topic",
+        'study.generating_new': "Generating new words...",
+        'study.finish': "Finish",
+        'study.finish_delete': "Finish & Remove",
+        'study.finish_delete_desc': "Remove deck from your collection",
+        'study.deleting': "Removing...",
+        'study.confirm_delete': "Are you sure you want to remove this deck from your collection?",
+        'study.loading_progress': "Loading your progress...",
+        'study.no_cards': "No cards available",
+        'study.return_dashboard': "Return to Dashboard",
+        'study.rate_deck': "Rate This Deck",
+
+
+        // Explore
+        'explore.title': "Explore",
+        'explore.search_placeholder': "Search for a language, topic, or deck...",
+        'explore.all_languages': "All Languages",
+        'explore.ai_curated': "AI Curated",
+        'explore.advanced': "Advanced",
+        'explore.community_favorites': "Community Favorites",
+        'explore.tab_all': "All",
+        'explore.tab_popular': "Popular",
+        'explore.tab_new': "New",
+        'explore.clones': "clones",
+        'explore.ratings': "ratings",
+        'explore.no_rating': "No ratings yet",
+        'explore.trending': "Trending Decks",
+        'explore.view_all': "View All",
+        'explore.need_specific': "Need something specific?",
+        'explore.ai_description': "Our AI engine can build a custom deck for any niche.",
+        'explore.ai_generate': "AI Generate",
+        'explore.create_manually': "Create Manually",
+        'explore.custom_deck_ai': "Custom Deck AI",
+        'explore.tell_aura': "Tell Aura what you want to learn today.",
+        'explore.learning_topic': "Learning Topic",
+        'explore.topic_placeholder': "e.g. Scuba Diving vocabulary",
+        'explore.target_language': "Target Language",
+        'explore.native_language': "Your Native Language",
+        'explore.select_language': "Select language...",
+        'explore.generate_deck': "Generate Deck",
+        'explore.generating': "Generating Sanctuary...",
+        'explore.create_manual_deck': "Create Manual Deck",
+        'explore.manual_description': "Create your own custom deck with exactly 10 cards.",
+        'explore.deck_title': "Deck Title",
+        'explore.make_public': "Make this deck public (visible to all users)",
+        'explore.cards_count': "Cards",
+        'explore.add_card': "Add Card",
+        'explore.word_target': "Word (target lang)",
+        'explore.translation': "Translation",
+        'explore.example_native': "Example sentence (native language)",
+        'explore.correct_target': "Correct sentence (target language)",
+        'explore.create_deck': "Create Deck",
+        'explore.creating_deck': "Creating Deck...",
+        'explore.community_library': "Community Library",
+        'explore.public_decks': "Public Decks",
+        'explore.loading_community': "Loading community decks...",
+        'explore.no_public': "No public decks yet",
+        'explore.be_first': "Be the first to create a public deck!",
+        'explore.clone': "Clone",
+
+        // Profile
+        'profile.title': "Profile",
+        'profile.settings': "Settings",
+        'profile.tab_profile': "Profile",
+        'profile.tab_settings': "Settings",
+        'profile.day_streak': "day streak",
+        'profile.logout': "Logout",
+        'profile.confirm_logout': "Are you sure you want to logout?",
+
+        // Profile Stats
+        'profile.words_learned': "Words Learned",
+        'profile.current_streak': "Current Streak",
+        'profile.days': "days",
+        'profile.avg_rating': "Avg Rating",
+        'profile.mastery': "Mastery",
+        'profile.learning_consistency': "Learning Consistency",
+        'profile.past_months': "Past 6 Months",
+        'profile.less': "Less",
+        'profile.more': "More",
+        'profile.your_journey': "Your Language Journey",
+
+        // Settings Menu
+        'profile.menu_profile': "Profile",
+        'profile.menu_language': "Language",
+        'profile.menu_interests': "Interests",
+        'profile.menu_security': "Security",
+        'profile.menu_danger': "Danger Zone",
+
+        // Settings Sections
+        'profile.section_profile': "Profile Information",
+        'profile.section_language': "Language Settings",
+        'profile.section_interests': "Your Interests",
+        'profile.section_security': "Security",
+        'profile.section_danger': "Danger Zone",
+
+        // Form Fields
+        'profile.username': "Username",
+        'profile.bio': "Bio",
+        'profile.bio_placeholder': "Tell us about yourself...",
+        'profile.native_lang': "Native Language",
+        'profile.target_lang': "Target Language",
+        'profile.level': "Proficiency Level",
+        'profile.interests_desc': "Select topics you're interested in learning about.",
+        'profile.new_password': "New Password",
+        'profile.confirm_password': "Confirm Password",
+
+        // Actions
+        'profile.save_changes': "Save Changes",
+        'profile.saving': "Saving...",
+        'profile.save_success': "Changes saved successfully!",
+        'profile.save_error': "Failed to save changes",
+        'profile.update_password': "Update Password",
+        'profile.updating': "Updating...",
+        'profile.password_success': "Password updated successfully!",
+        'profile.password_error': "Failed to update password",
+        'profile.password_mismatch': "Passwords do not match",
+        'profile.password_too_short': "Password must be at least 6 characters",
+        'profile.avatar_error': "Failed to upload avatar",
+
+        // Danger Zone
+        'profile.delete_warning': "Once you delete your account, there is no going back. All your data will be permanently removed.",
+        'profile.type_delete': "Type DELETE to confirm",
+        'profile.delete_account': "Delete Account",
+        'profile.deleting': "Deleting...",
+        'profile.delete_type_confirm': "Please type DELETE to confirm",
+        'profile.confirm_delete': "Are you absolutely sure? This action cannot be undone.",
+        'profile.delete_error': "Failed to delete account",
+
+        // Landing
+        'landing.hero_title': "Master Any Language",
+        'landing.hero_subtitle': "AI-powered learning that adapts to you",
+        'landing.get_started': "Get Started",
+        'landing.sign_in': "Sign In",
+
+        // Auth
+        'auth.sign_in': "Sign In",
+        'auth.sign_up': "Sign Up",
+        'auth.email': "Email",
+        'auth.password': "Password",
+        'auth.confirm_password': "Confirm Password",
+        'auth.remember_me': "Remember me",
+        'auth.forgot_password': "Forgot password?",
+        'auth.no_account': "Don't have an account?",
+        'auth.have_account': "Already have an account?",
+
+        // Common
+        'common.loading': "Loading...",
+        'common.error': "Something went wrong",
+        'common.success': "Success!",
+        'common.noun': "Noun",
+        'common.verb': "Verb",
+        'common.adjective': "Adjective",
+        'common.adverb': "Adverb",
+        'common.phrase': "Phrase",
+
+        // Levels
+        'level.beginner': "Beginner",
+        'level.beginner_desc': "Basic phrases, greetings, introductions",
+        'level.elementary': "Elementary",
+        'level.elementary_desc': "Simple conversations about daily topics",
+        'level.intermediate': "Intermediate",
+        'level.intermediate_desc': "Main ideas, travel, personal experiences",
+        'level.upper_intermediate': "Upper-Intermediate",
+        'level.upper_intermediate_desc': "Complex texts, fluent conversations",
+        'level.advanced': "Advanced",
+        'level.advanced_desc': "Flexible use, professional contexts",
+        'level.mastery': "Mastery",
+        'level.mastery_desc': "Near-native fluency in all situations",
+    },
+
+    tr: {
+        // Onboarding
+        'onboarding.native_title': "Ana diliniz nedir?",
+        'onboarding.native_subtitle': "Bu, daha iyi çeviriler sunmamıza yardımcı olur",
+        'onboarding.target_title': "Hangi dili öğrenmek istiyorsunuz?",
+        'onboarding.target_subtitle': "Konuştuğunuz dil",
+        'onboarding.level_title': "Seviyeniz nedir?",
+        'onboarding.level_subtitle': "Dürüst olun - deneyiminizi özelleştireceğiz",
+        'onboarding.interests_title': "Hangi konular ilginizi çekiyor?",
+        'onboarding.interests_subtitle': "Destelerinizi kişiselleştirmek için ilgi alanlarınızı seçin",
+        'onboarding.minimum': "minimum",
+        'onboarding.continue': "Devam",
+        'onboarding.back': "Geri",
+        'onboarding.start_learning': "Öğrenmeye Başla",
+        'onboarding.saving': "Kaydediliyor...",
+
+        // Dashboard
+        'dashboard.title': "Sığınağınız",
+        'dashboard.journey': "DİL YOLCULUĞUNUZ",
+        'dashboard.starter_decks': "Başlangıç Desteleri",
+        'dashboard.your_interests': "İlgi Alanlarınız",
+        'dashboard.add_premade': "Seviyenize uygun hazır desteler ekleyin",
+        'dashboard.your_decks': "Desteleriniz",
+        'dashboard.no_decks': "Henüz deste yok",
+        'dashboard.no_decks_hint': "İlk destenizi oluşturmak için Keşfet'e gidin!",
+        'dashboard.loading_decks': "Desteleriniz yükleniyor...",
+        'dashboard.add_deck': "Deste Ekle",
+        'dashboard.added': "Eklendi",
+        'dashboard.creating': "Oluşturuluyor...",
+        'dashboard.cards': "kart",
+        'dashboard.words': "kelime",
+        'dashboard.words_learned': "Öğrenilen Kelimeler",
+        'dashboard.accuracy': "Doğruluk",
+        'dashboard.streak': "Seri",
+        'dashboard.daily_quests': "Günlük Görevler",
+        'dashboard.review_cards': "20 kart gözden geçir",
+        'dashboard.accuracy_rate': "%90 Doğruluk Oranı",
+        'dashboard.maintain_streak': "Seriyi Koru",
+        'dashboard.completed': "TAMAMLANDI",
+        'dashboard.current': "MEVCUT",
+        'dashboard.day_of': "GÜN",
+
+        // Quests
+        'quests.title': "Görevleriniz",
+        'quests.completed': "tamamlandı",
+        'quests.earned': "bugün kazanıldı",
+        'quests.today': "Bugün",
+        'quests.daily': "Günlük Görevler",
+        'quests.weekly': "Haftalık Görevler",
+        'quests.resets_midnight': "Gece yarısı sıfırlanır",
+        'quests.resets_monday': "Pazartesi sıfırlanır",
+
+        // Rating
+        'rating.how_was': "Bu deste nasıldı?",
+        'rating.tap_to_rate': "Puanlamak için bir yıldıza dokunun",
+        'rating.terrible': "Berbat",
+        'rating.poor': "Kötü",
+        'rating.okay': "İdare Eder",
+        'rating.good': "İyi",
+        'rating.excellent': "Mükemmel!",
+        'rating.skip': "Atla",
+        'rating.submit': "Gönder",
+        'rating.submitting': "Gönderiliyor...",
+        'rating.thank_you': "Teşekkürler!",
+        'rating.feedback_helps': "Geri bildiriminiz başkalarının harika desteler bulmasına yardımcı oluyor.",
+
+        // Study Mode
+        'study.card': "Kart",
+        'study.of': "/",
+        'study.example': "Örnek (Bağlam)",
+        'study.write_sentence': "Kullanarak bir cümle yazın",
+        'study.type_sentence': "Kullanarak cümlenizi yazın",
+        'study.correct_sentence': "Doğru Cümle",
+        'study.your_submission': "Cevabınız",
+        'study.ai_analysis': "AI Analizi",
+        'study.try_again': "Tekrar Dene",
+        'study.next': "Sonraki",
+        'study.session_complete': "Oturum Tamamlandı!",
+        'study.completed_all': "Bu destedeki tüm kartları tamamladınız.",
+        'study.start_over': "Baştan Başla",
+        'study.start_over_desc': "Aynı kelimeleri tekrar çalış",
+        'study.fresh_start': "Yeni Başlangıç",
+        'study.fresh_start_desc': "Yeni kelimeler, aynı konu",
+        'study.generating_new': "Yeni kelimeler oluşturuluyor...",
+        'study.finish': "Bitir",
+        'study.finish_delete': "Bitir ve Kaldır",
+        'study.finish_delete_desc': "Desteyi koleksiyondan kaldır",
+        'study.deleting': "Kaldırılıyor...",
+        'study.confirm_delete': "Bu desteyi koleksiyonunuzdan kaldırmak istediğinize emin misiniz?",
+        'study.loading_progress': "İlerlemeniz yükleniyor...",
+        'study.no_cards': "Kart bulunmuyor",
+        'study.return_dashboard': "Ana Sayfaya Dön",
+        'study.rate_deck': "Bu Desteyi Puanla",
+
+        // Explore
+        'explore.title': "Keşfet",
+        'explore.search_placeholder': "Dil, konu veya deste ara...",
+        'explore.all_languages': "Tüm Diller",
+        'explore.ai_curated': "AI Seçkisi",
+        'explore.advanced': "İleri Düzey",
+        'explore.community_favorites': "Topluluk Favorileri",
+        'explore.tab_all': "Tümü",
+        'explore.tab_popular': "Popüler",
+        'explore.tab_new': "Yeni",
+        'explore.clones': "kullanıcı",
+        'explore.ratings': "değerlendirme",
+        'explore.no_rating': "Henüz puan yok",
+        'explore.trending': "Popüler Desteler",
+        'explore.view_all': "Tümünü Gör",
+        'explore.need_specific': "Özel bir şeye mi ihtiyacınız var?",
+        'explore.ai_description': "AI motorumuz herhangi bir niş için özel deste oluşturabilir.",
+        'explore.ai_generate': "AI ile Oluştur",
+        'explore.create_manually': "Manuel Oluştur",
+        'explore.custom_deck_ai': "Özel Deste AI",
+        'explore.tell_aura': "Aura'ya bugün ne öğrenmek istediğinizi söyleyin.",
+        'explore.learning_topic': "Öğrenme Konusu",
+        'explore.topic_placeholder': "örn. Dalış kelime bilgisi",
+        'explore.target_language': "Hedef Dil",
+        'explore.native_language': "Ana Diliniz",
+        'explore.select_language': "Dil seçin...",
+        'explore.generate_deck': "Deste Oluştur",
+        'explore.generating': "Sığınak Oluşturuluyor...",
+        'explore.create_manual_deck': "Manuel Deste Oluştur",
+        'explore.manual_description': "Tam 10 kartlık özel deste oluşturun.",
+        'explore.deck_title': "Deste Başlığı",
+        'explore.make_public': "Bu desteyi herkese açık yap",
+        'explore.cards_count': "Kartlar",
+        'explore.add_card': "Kart Ekle",
+        'explore.word_target': "Kelime (hedef dil)",
+        'explore.translation': "Çeviri",
+        'explore.example_native': "Örnek cümle (ana dil)",
+        'explore.correct_target': "Doğru cümle (hedef dil)",
+        'explore.create_deck': "Deste Oluştur",
+        'explore.creating_deck': "Deste Oluşturuluyor...",
+        'explore.community_library': "Topluluk Kütüphanesi",
+        'explore.public_decks': "Herkese Açık Desteler",
+        'explore.loading_community': "Topluluk desteleri yükleniyor...",
+        'explore.no_public': "Henüz herkese açık deste yok",
+        'explore.be_first': "İlk herkese açık desteyi oluşturan siz olun!",
+        'explore.clone': "Kopyala",
+
+        // Profile
+        'profile.title': "Profil",
+        'profile.settings': "Ayarlar",
+        'profile.tab_profile': "Profil",
+        'profile.tab_settings': "Ayarlar",
+        'profile.day_streak': "günlük seri",
+        'profile.logout': "Çıkış Yap",
+        'profile.confirm_logout': "Çıkış yapmak istediğinize emin misiniz?",
+
+        // Profile Stats
+        'profile.words_learned': "Öğrenilen Kelimeler",
+        'profile.current_streak': "Mevcut Seri",
+        'profile.days': "gün",
+        'profile.avg_rating': "Ort. Puan",
+        'profile.mastery': "Ustalık",
+        'profile.learning_consistency': "Öğrenme Tutarlılığı",
+        'profile.past_months': "Son 6 Ay",
+        'profile.less': "Az",
+        'profile.more': "Çok",
+        'profile.your_journey': "Dil Yolculuğunuz",
+
+        // Settings Menu
+        'profile.menu_profile': "Profil",
+        'profile.menu_language': "Dil",
+        'profile.menu_interests': "İlgi Alanları",
+        'profile.menu_security': "Güvenlik",
+        'profile.menu_danger': "Tehlikeli Bölge",
+
+        // Settings Sections
+        'profile.section_profile': "Profil Bilgileri",
+        'profile.section_language': "Dil Ayarları",
+        'profile.section_interests': "İlgi Alanlarınız",
+        'profile.section_security': "Güvenlik",
+        'profile.section_danger': "Tehlikeli Bölge",
+
+        // Form Fields
+        'profile.username': "Kullanıcı Adı",
+        'profile.bio': "Hakkında",
+        'profile.bio_placeholder': "Kendinizden bahsedin...",
+        'profile.native_lang': "Ana Dil",
+        'profile.target_lang': "Hedef Dil",
+        'profile.level': "Yeterlilik Seviyesi",
+        'profile.interests_desc': "Öğrenmek istediğiniz konuları seçin.",
+        'profile.new_password': "Yeni Şifre",
+        'profile.confirm_password': "Şifreyi Onayla",
+
+        // Actions
+        'profile.save_changes': "Değişiklikleri Kaydet",
+        'profile.saving': "Kaydediliyor...",
+        'profile.save_success': "Değişiklikler başarıyla kaydedildi!",
+        'profile.save_error': "Değişiklikler kaydedilemedi",
+        'profile.update_password': "Şifreyi Güncelle",
+        'profile.updating': "Güncelleniyor...",
+        'profile.password_success': "Şifre başarıyla güncellendi!",
+        'profile.password_error': "Şifre güncellenemedi",
+        'profile.password_mismatch': "Şifreler eşleşmiyor",
+        'profile.password_too_short': "Şifre en az 6 karakter olmalı",
+        'profile.avatar_error': "Avatar yüklenemedi",
+
+        // Danger Zone
+        'profile.delete_warning': "Hesabınızı sildiğinizde geri dönüşü yoktur. Tüm verileriniz kalıcı olarak silinecektir.",
+        'profile.type_delete': "Onaylamak için DELETE yazın",
+        'profile.delete_account': "Hesabı Sil",
+        'profile.deleting': "Siliniyor...",
+        'profile.delete_type_confirm': "Lütfen onaylamak için DELETE yazın",
+        'profile.confirm_delete': "Kesinlikle emin misiniz? Bu işlem geri alınamaz.",
+        'profile.delete_error': "Hesap silinemedi",
+
+        // Landing
+        'landing.hero_title': "Her Dilde Ustalaşın",
+        'landing.hero_subtitle': "Size uyum sağlayan AI destekli öğrenme",
+        'landing.get_started': "Başlayın",
+        'landing.sign_in': "Giriş Yap",
+
+        // Auth
+        'auth.sign_in': "Giriş Yap",
+        'auth.sign_up': "Kayıt Ol",
+        'auth.email': "E-posta",
+        'auth.password': "Şifre",
+        'auth.confirm_password': "Şifreyi Onayla",
+        'auth.remember_me': "Beni hatırla",
+        'auth.forgot_password': "Şifrenizi mi unuttunuz?",
+        'auth.no_account': "Hesabınız yok mu?",
+        'auth.have_account': "Zaten hesabınız var mı?",
+
+        // Common
+        'common.loading': "Yükleniyor...",
+        'common.error': "Bir şeyler yanlış gitti",
+        'common.success': "Başarılı!",
+        'common.noun': "İsim",
+        'common.verb': "Fiil",
+        'common.adjective': "Sıfat",
+        'common.adverb': "Zarf",
+        'common.phrase': "Deyim",
+
+        // Levels
+        'level.beginner': "Başlangıç",
+        'level.beginner_desc': "Temel kalıplar, selamlaşmalar, tanışmalar",
+        'level.elementary': "Temel",
+        'level.elementary_desc': "Günlük konular hakkında basit konuşmalar",
+        'level.intermediate': "Orta",
+        'level.intermediate_desc': "Ana fikirler, seyahat, kişisel deneyimler",
+        'level.upper_intermediate': "Orta-Üst",
+        'level.upper_intermediate_desc': "Karmaşık metinler, akıcı konuşmalar",
+        'level.advanced': "İleri",
+        'level.advanced_desc': "Esnek kullanım, profesyonel bağlamlar",
+        'level.mastery': "Ustalık",
+        'level.mastery_desc': "Her durumda anadil düzeyinde akıcılık",
+    }
+};
+
+interface I18nContextType {
+    language: string;
+    setLanguage: (lang: string) => void;
+    t: (key: string) => string;
+}
+
+const I18nContext = createContext<I18nContextType | undefined>(undefined);
+
+export const I18nProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+    const [language, setLanguageState] = useState<string>(() => {
+        // Check localStorage first, then default to 'en'
+        return localStorage.getItem('app_language') || 'en';
+    });
+
+    const setLanguage = (lang: string) => {
+        localStorage.setItem('app_language', lang);
+        setLanguageState(lang);
+    };
+
+    const t = (key: string): string => {
+        return translations[language]?.[key] || translations['en']?.[key] || key;
+    };
+
+    return (
+        <I18nContext.Provider value={{ language, setLanguage, t }}>
+            {children}
+        </I18nContext.Provider>
+    );
+};
+
+export const useTranslation = (): I18nContextType => {
+    const context = useContext(I18nContext);
+    if (!context) {
+        throw new Error('useTranslation must be used within I18nProvider');
+    }
+    return context;
+};
+
+// Export available languages
+export const AVAILABLE_LANGUAGES = [
+    { code: 'en', name: 'English', flag: '🇬🇧' },
+    { code: 'tr', name: 'Türkçe', flag: '🇹🇷' },
+];

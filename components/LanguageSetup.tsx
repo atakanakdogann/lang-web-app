@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, ChevronLeft, Globe, BookOpen, Target, Sparkles } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Globe, BookOpen, Target, Sparkles, Heart } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { useTranslation } from '../services/i18n';
 
 interface LanguageSetupProps {
     userId: string;
@@ -10,17 +11,13 @@ interface LanguageSetupProps {
 
 const LANGUAGES = [
     { code: 'en', name: 'English', flag: '🇬🇧' },
+    { code: 'tr', name: 'Turkish', flag: '🇹🇷' },
+    { code: 'de', name: 'German', flag: '🇩🇪' },
+    { code: 'ru', name: 'Russian', flag: '🇷🇺' },
     { code: 'es', name: 'Spanish', flag: '🇪🇸' },
     { code: 'fr', name: 'French', flag: '🇫🇷' },
-    { code: 'de', name: 'German', flag: '🇩🇪' },
     { code: 'it', name: 'Italian', flag: '🇮🇹' },
     { code: 'pt', name: 'Portuguese', flag: '🇵🇹' },
-    { code: 'tr', name: 'Turkish', flag: '🇹🇷' },
-    { code: 'ja', name: 'Japanese', flag: '🇯🇵' },
-    { code: 'ko', name: 'Korean', flag: '🇰🇷' },
-    { code: 'zh', name: 'Chinese', flag: '🇨🇳' },
-    { code: 'ru', name: 'Russian', flag: '🇷🇺' },
-    { code: 'ar', name: 'Arabic', flag: '🇸🇦' },
 ];
 
 const LEVELS = [
@@ -32,15 +29,53 @@ const LEVELS = [
     { code: 'C2', name: 'Mastery', description: 'Near-native fluency in all situations', color: 'from-purple-500 to-pink-500' },
 ];
 
+const INTERESTS = [
+    { id: 'travel', emoji: '✈️', name: 'Travel' },
+    { id: 'food', emoji: '🍕', name: 'Food & Cooking' },
+    { id: 'tech', emoji: '💻', name: 'Technology' },
+    { id: 'sports', emoji: '⚽', name: 'Sports' },
+    { id: 'music', emoji: '🎵', name: 'Music' },
+    { id: 'movies', emoji: '🎬', name: 'Movies & TV' },
+    { id: 'business', emoji: '💼', name: 'Business' },
+    { id: 'science', emoji: '🔬', name: 'Science' },
+    { id: 'art', emoji: '🎨', name: 'Art & Design' },
+    { id: 'fashion', emoji: '👗', name: 'Fashion' },
+    { id: 'gaming', emoji: '🎮', name: 'Gaming' },
+    { id: 'health', emoji: '🏥', name: 'Health & Fitness' },
+    { id: 'nature', emoji: '🌿', name: 'Nature' },
+    { id: 'books', emoji: '📚', name: 'Books & Reading' },
+    { id: 'social', emoji: '💬', name: 'Social & Culture' },
+];
+
 const LanguageSetup: React.FC<LanguageSetupProps> = ({ userId, onComplete }) => {
+    const { t, setLanguage } = useTranslation();
     const [step, setStep] = useState(1);
     const [nativeLang, setNativeLang] = useState('');
     const [targetLang, setTargetLang] = useState('');
     const [level, setLevel] = useState('');
+    const [interests, setInterests] = useState<string[]>([]);
     const [isSaving, setIsSaving] = useState(false);
 
+    // Toggle interest selection
+    const toggleInterest = (interestId: string) => {
+        setInterests(prev =>
+            prev.includes(interestId)
+                ? prev.filter(id => id !== interestId)
+                : [...prev, interestId]
+        );
+    };
+
+    // Handle native language selection - apply translation immediately
+    const handleNativeLangSelect = (langCode: string) => {
+        setNativeLang(langCode);
+        // Apply translation immediately if language is supported (en or tr)
+        if (langCode === 'en' || langCode === 'tr') {
+            setLanguage(langCode);
+        }
+    };
+
     const handleComplete = async () => {
-        if (!nativeLang || !targetLang || !level) return;
+        if (!nativeLang || !targetLang || !level || interests.length < 4) return;
 
         setIsSaving(true);
         try {
@@ -50,6 +85,7 @@ const LanguageSetup: React.FC<LanguageSetupProps> = ({ userId, onComplete }) => 
                     native_lang: nativeLang,
                     target_lang: targetLang,
                     proficiency_level: level,
+                    interests: interests,
                     onboarding_complete: true,
                 })
                 .eq('id', userId);
@@ -88,7 +124,7 @@ const LanguageSetup: React.FC<LanguageSetupProps> = ({ userId, onComplete }) => 
             >
                 {/* Progress Bar */}
                 <div className="flex gap-2 mb-8">
-                    {[1, 2, 3].map((s) => (
+                    {[1, 2, 3, 4].map((s) => (
                         <div
                             key={s}
                             className={`flex-1 h-2 rounded-full transition-all ${s <= step ? 'bg-gradient-to-r from-blue-500 to-purple-500' : 'bg-gray-200'
@@ -111,18 +147,18 @@ const LanguageSetup: React.FC<LanguageSetupProps> = ({ userId, onComplete }) => 
                                 <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-500 rounded-3xl flex items-center justify-center mx-auto mb-4">
                                     <Globe className="text-white" size={32} />
                                 </div>
-                                <h2 className="text-3xl font-bold mb-2">What's your native language?</h2>
-                                <p className="text-gray-500">This helps us provide better translations</p>
+                                <h2 className="text-3xl font-bold mb-2">{t('onboarding.native_title')}</h2>
+                                <p className="text-gray-500">{t('onboarding.native_subtitle')}</p>
                             </div>
 
                             <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                                 {LANGUAGES.map((lang) => (
                                     <button
                                         key={lang.code}
-                                        onClick={() => setNativeLang(lang.code)}
+                                        onClick={() => handleNativeLangSelect(lang.code)}
                                         className={`p-4 rounded-2xl border-2 transition-all hover:scale-105 ${nativeLang === lang.code
-                                                ? 'border-blue-500 bg-blue-50 shadow-lg shadow-blue-500/20'
-                                                : 'border-gray-200 hover:border-gray-300'
+                                            ? 'border-blue-500 bg-blue-50 shadow-lg shadow-blue-500/20'
+                                            : 'border-gray-200 hover:border-gray-300'
                                             }`}
                                     >
                                         <span className="text-3xl block mb-1">{lang.flag}</span>
@@ -136,7 +172,7 @@ const LanguageSetup: React.FC<LanguageSetupProps> = ({ userId, onComplete }) => 
                                 disabled={!nativeLang}
                                 className="w-full bg-gradient-to-r from-blue-500 to-purple-500 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-blue-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                Continue
+                                {t('onboarding.continue')}
                                 <ChevronRight size={20} />
                             </button>
                         </motion.div>
@@ -155,9 +191,9 @@ const LanguageSetup: React.FC<LanguageSetupProps> = ({ userId, onComplete }) => 
                                 <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-3xl flex items-center justify-center mx-auto mb-4">
                                     <Target className="text-white" size={32} />
                                 </div>
-                                <h2 className="text-3xl font-bold mb-2">What do you want to learn?</h2>
+                                <h2 className="text-3xl font-bold mb-2">{t('onboarding.target_title')}</h2>
                                 <p className="text-gray-500">
-                                    You speak {getSelectedNativeLang()?.flag} {getSelectedNativeLang()?.name}
+                                    {t('onboarding.target_subtitle')} {getSelectedNativeLang()?.flag} {getSelectedNativeLang()?.name}
                                 </p>
                             </div>
 
@@ -167,8 +203,8 @@ const LanguageSetup: React.FC<LanguageSetupProps> = ({ userId, onComplete }) => 
                                         key={lang.code}
                                         onClick={() => setTargetLang(lang.code)}
                                         className={`p-4 rounded-2xl border-2 transition-all hover:scale-105 ${targetLang === lang.code
-                                                ? 'border-purple-500 bg-purple-50 shadow-lg shadow-purple-500/20'
-                                                : 'border-gray-200 hover:border-gray-300'
+                                            ? 'border-purple-500 bg-purple-50 shadow-lg shadow-purple-500/20'
+                                            : 'border-gray-200 hover:border-gray-300'
                                             }`}
                                     >
                                         <span className="text-3xl block mb-1">{lang.flag}</span>
@@ -183,14 +219,14 @@ const LanguageSetup: React.FC<LanguageSetupProps> = ({ userId, onComplete }) => 
                                     className="px-6 py-4 rounded-2xl font-bold flex items-center gap-2 hover:bg-gray-100 transition-all"
                                 >
                                     <ChevronLeft size={20} />
-                                    Back
+                                    {t('onboarding.back')}
                                 </button>
                                 <button
                                     onClick={() => setStep(3)}
                                     disabled={!targetLang}
                                     className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-purple-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    Continue
+                                    {t('onboarding.continue')}
                                     <ChevronRight size={20} />
                                 </button>
                             </div>
@@ -211,10 +247,10 @@ const LanguageSetup: React.FC<LanguageSetupProps> = ({ userId, onComplete }) => 
                                     <BookOpen className="text-white" size={32} />
                                 </div>
                                 <h2 className="text-3xl font-bold mb-2">
-                                    What's your {getSelectedTargetLang()?.name} level?
+                                    {t('onboarding.level_title')}
                                 </h2>
                                 <p className="text-gray-500">
-                                    {getSelectedNativeLang()?.flag} → {getSelectedTargetLang()?.flag} Be honest - we'll customize your experience
+                                    {getSelectedNativeLang()?.flag} → {getSelectedTargetLang()?.flag} {t('onboarding.level_subtitle')}
                                 </p>
                             </div>
 
@@ -224,8 +260,8 @@ const LanguageSetup: React.FC<LanguageSetupProps> = ({ userId, onComplete }) => 
                                         key={lvl.code}
                                         onClick={() => setLevel(lvl.code)}
                                         className={`w-full p-4 rounded-2xl border-2 text-left transition-all hover:scale-[1.02] ${level === lvl.code
-                                                ? 'border-blue-500 bg-blue-50 shadow-lg'
-                                                : 'border-gray-200 hover:border-gray-300'
+                                            ? 'border-blue-500 bg-blue-50 shadow-lg'
+                                            : 'border-gray-200 hover:border-gray-300'
                                             }`}
                                     >
                                         <div className="flex items-center gap-4">
@@ -252,18 +288,73 @@ const LanguageSetup: React.FC<LanguageSetupProps> = ({ userId, onComplete }) => 
                                     className="px-6 py-4 rounded-2xl font-bold flex items-center gap-2 hover:bg-gray-100 transition-all"
                                 >
                                     <ChevronLeft size={20} />
-                                    Back
+                                    {t('onboarding.back')}
+                                </button>
+                                <button
+                                    onClick={() => setStep(4)}
+                                    disabled={!level}
+                                    className="flex-1 bg-gradient-to-r from-blue-500 to-purple-500 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-blue-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {t('onboarding.continue')}
+                                    <ChevronRight size={20} />
+                                </button>
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* Step 4: Interests */}
+                    {step === 4 && (
+                        <motion.div
+                            key="step4"
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -20 }}
+                            className="space-y-6"
+                        >
+                            <div className="text-center">
+                                <div className="w-16 h-16 bg-gradient-to-br from-pink-500 to-rose-500 rounded-3xl flex items-center justify-center mx-auto mb-4">
+                                    <Heart className="text-white" size={32} />
+                                </div>
+                                <h2 className="text-3xl font-bold mb-2">{t('onboarding.interests_title')}</h2>
+                                <p className="text-gray-500">
+                                    {t('onboarding.interests_subtitle')} <span className="font-semibold text-blue-500">({interests.length}/4 {t('onboarding.minimum')})</span>
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-3 sm:grid-cols-5 gap-3 max-h-[35vh] overflow-y-auto pr-2">
+                                {INTERESTS.map((interest) => (
+                                    <button
+                                        key={interest.id}
+                                        onClick={() => toggleInterest(interest.id)}
+                                        className={`p-4 rounded-2xl border-2 transition-all hover:scale-105 text-center ${interests.includes(interest.id)
+                                            ? 'border-pink-500 bg-pink-50 shadow-lg shadow-pink-500/20'
+                                            : 'border-gray-200 hover:border-gray-300'
+                                            }`}
+                                    >
+                                        <span className="text-2xl block mb-1">{interest.emoji}</span>
+                                        <span className="text-xs font-medium">{interest.name}</span>
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setStep(3)}
+                                    className="px-6 py-4 rounded-2xl font-bold flex items-center gap-2 hover:bg-gray-100 transition-all"
+                                >
+                                    <ChevronLeft size={20} />
+                                    {t('onboarding.back')}
                                 </button>
                                 <button
                                     onClick={handleComplete}
-                                    disabled={!level || isSaving}
-                                    className="flex-1 bg-gradient-to-r from-blue-500 to-purple-500 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-blue-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                    disabled={interests.length < 4 || isSaving}
+                                    className="flex-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-pink-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {isSaving ? (
-                                        'Saving...'
+                                        t('onboarding.saving')
                                     ) : (
                                         <>
-                                            Start Learning
+                                            {t('onboarding.start_learning')}
                                             <Sparkles size={20} />
                                         </>
                                     )}

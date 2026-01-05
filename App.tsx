@@ -5,10 +5,12 @@ import {
   LayoutDashboard,
   Search,
   User,
-  Plus
+  Plus,
+  Target
 } from 'lucide-react';
 import { AppView, Deck } from './types';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { I18nProvider } from './services/i18n';
 import { deckService } from './services/deckService';
 import { cardService } from './services/cardService';
 import { progressService } from './services/progressService';
@@ -18,6 +20,8 @@ import Explore from './components/Explore';
 import Profile from './components/Profile';
 import Landing from './components/Landing';
 import LanguageSetup from './components/LanguageSetup';
+import LanguageSwitcher from './components/LanguageSwitcher';
+import QuestsPanel from './components/QuestsPanel';
 
 const MainApp: React.FC = () => {
   const { user, profile, loading } = useAuth();
@@ -25,6 +29,7 @@ const MainApp: React.FC = () => {
   const [decks, setDecks] = useState<Deck[]>([]);
   const [activeDeck, setActiveDeck] = useState<Deck | null>(null);
   const [loadingDecks, setLoadingDecks] = useState(true);
+  const [questsOpen, setQuestsOpen] = useState(false);
 
   // Load user's decks from Supabase
   useEffect(() => {
@@ -92,6 +97,32 @@ const MainApp: React.FC = () => {
     loadDecks();
   }, [user]);
 
+  // Refresh progress for a specific deck (called when exiting study mode)
+  const refreshDeckProgress = async (deckId: string) => {
+    if (!user) return;
+
+    try {
+      const progressMap = await progressService.getAllDecksProgress(user.id, [deckId]);
+      const progress = progressMap.get(deckId);
+
+      if (progress) {
+        setDecks(prev => prev.map(d => {
+          if (d.id === deckId) {
+            return {
+              ...d,
+              progress: progress.progress,
+              averageRating: progress.averageRating,
+              cardsStudied: progress.cardsStudied
+            };
+          }
+          return d;
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to refresh deck progress:', error);
+    }
+  };
+
   const startStudy = (deck: Deck) => {
     if (!deck.cards || deck.cards.length === 0) {
       alert("This deck is empty! Try exploring or generating a custom one.");
@@ -103,6 +134,25 @@ const MainApp: React.FC = () => {
 
   const handleAddDeck = (newDeck: Deck) => {
     setDecks(prev => [newDeck, ...prev]);
+    setView('Dashboard');
+  };
+
+  const handleDeckDeleted = (deckId: string) => {
+    setDecks(prev => prev.filter(d => d.id !== deckId));
+    setActiveDeck(null);
+  };
+
+  const handleDeckRegenerated = (newDeck: Deck) => {
+    setDecks(prev => prev.map(d => d.id === newDeck.id ? newDeck : d));
+    setActiveDeck(newDeck);
+  };
+
+  // Handle exiting study mode - refresh progress
+  const handleExitStudy = () => {
+    if (activeDeck) {
+      refreshDeckProgress(activeDeck.id);
+    }
+    setActiveDeck(null);
     setView('Dashboard');
   };
 
@@ -174,8 +224,23 @@ const MainApp: React.FC = () => {
         )}
       </AnimatePresence>
 
+      {/* Top Right Controls - Quests & Language Switcher */}
+      <div className="fixed top-6 right-6 z-50 flex items-center gap-3">
+        {/* Quests Button */}
+        <button
+          onClick={() => setQuestsOpen(true)}
+          className="relative p-3 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-2xl shadow-lg hover:shadow-xl transition-all hover:scale-105"
+        >
+          <Target size={20} />
+        </button>
+        <LanguageSwitcher />
+      </div>
+
+      {/* Quests Panel */}
+      <QuestsPanel isOpen={questsOpen} onClose={() => setQuestsOpen(false)} />
+
       {/* Main Content Area - Added relative z-50 to ensure it stays above the blur */}
-      <main className="w-full max-w-6xl px-6 py-12 pb-32 relative z-50">
+      <main className="w-full max-w-6xl px-6 py-12 pb-32 relative z-40">
         <AnimatePresence mode="wait">
           {view === 'Dashboard' && (
             <motion.div
@@ -198,7 +263,12 @@ const MainApp: React.FC = () => {
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
               className="flex justify-center items-center min-h-[70vh]"
             >
-              <StudyMode deck={activeDeck} onExit={() => setView('Dashboard')} />
+              <StudyMode
+                deck={activeDeck}
+                onExit={handleExitStudy}
+                onDeckDeleted={handleDeckDeleted}
+                onDeckRegenerated={handleDeckRegenerated}
+              />
             </motion.div>
           )}
 
@@ -230,7 +300,7 @@ const MainApp: React.FC = () => {
       {view !== 'Study' && (
         <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 glass px-6 py-3 rounded-[32px] shadow-2xl z-50 flex gap-4">
           <NavItem id="Dashboard" icon={<LayoutDashboard size={20} />} label="Hub" />
-          <NavItem id="Explore" icon={<Search size={20} />} label="Find" />
+          <NavItem id="Explore" icon={<Search size={20} />} label="Explore" />
           <NavItem id="Profile" icon={<User size={20} />} label="Me" />
         </nav>
       )}
@@ -240,9 +310,11 @@ const MainApp: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <MainApp />
-    </AuthProvider>
+    <I18nProvider>
+      <AuthProvider>
+        <MainApp />
+      </AuthProvider>
+    </I18nProvider>
   );
 };
 

@@ -30,26 +30,32 @@ export const analyzeSentence = async (
         Your task:
         1. Compare the user's sentence to the correct example
         2. Check if the user used "${targetWord}" correctly in context
-        3. Identify ANY differences in grammar, word choice, spelling, or structure
-        4. Provide SPECIFIC feedback on what was wrong and what should be used instead
+        3. Focus primarily on MEANING and VOCABULARY usage
+        4. Provide SPECIFIC feedback on what could be improved
         5. Give a STAR RATING from 1 to 5 (with 0.5 increments like 2.5, 3.5, 4.5)
         
-        RATING GUIDE:
-        - 5.0: Perfect! No mistakes at all
-        - 4.5: Excellent with very minor issues
-        - 4.0: Very good, small grammatical issues
-        - 3.5: Good attempt, some mistakes
-        - 3.0: Acceptable but noticeable errors
-        - 2.5: Below average, multiple errors
-        - 2.0: Poor, significant mistakes
+        RATING GUIDE (BE ENCOURAGING - focus on communication success):
+        - 5.0: Perfect or near-perfect, meaning is clear (minor punctuation differences are OK)
+        - 4.5: Excellent, small issues that don't affect understanding
+        - 4.0: Very good, minor grammatical issues but meaning is clear
+        - 3.5: Good attempt, some mistakes but word used correctly
+        - 3.0: Acceptable, message understandable despite errors
+        - 2.5: Below average, meaning somewhat unclear
+        - 2.0: Poor, significant issues affecting comprehension
         - 1.5: Very poor, barely understandable
-        - 1.0: Completely wrong
+        - 1.0: Completely wrong or word not used
         
-        Be constructive and educational. If the sentence is perfect, praise it.
+        IMPORTANT RATING RULES:
+        - Punctuation errors (periods, commas, capitalization) should have MINIMAL impact on rating
+        - If the user's sentence correctly uses the target word and conveys the right meaning, give at least 4.0
+        - Focus on: correct word usage > grammar structure > meaning preservation
+        - Be encouraging! The goal is to motivate learning, not discourage
+        
+        Be constructive and educational. If the sentence is correct in meaning, praise it!
         If there are mistakes, explain clearly IN ${nativeLanguage}:
         - What the user wrote
-        - What they should have written
-        - Why (grammar rule, word choice, collocation, etc.)
+        - What they could improve
+        - Why (grammar rule, word choice, etc.) - but be kind about punctuation
         
         Remember: The "explanation" field MUST be written entirely in ${nativeLanguage}!
       `,

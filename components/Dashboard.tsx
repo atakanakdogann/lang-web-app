@@ -5,6 +5,7 @@ import { Play, TrendingUp, CheckCircle2, Flame, Globe, Plus, Loader2 } from 'luc
 import { Deck } from '../types';
 import HealthRings from './HealthRings';
 import { useAuth } from '../contexts/AuthContext';
+import { useTranslation } from '../services/i18n';
 import { generateDeck } from '../services/geminiService';
 import { deckService } from '../services/deckService';
 import { cardService } from '../services/cardService';
@@ -17,9 +18,8 @@ interface DashboardProps {
 }
 
 const LANGUAGE_NAMES: Record<string, string> = {
-  en: 'English', es: 'Spanish', fr: 'French', de: 'German',
-  it: 'Italian', pt: 'Portuguese', tr: 'Turkish', ja: 'Japanese',
-  ko: 'Korean', zh: 'Chinese', ru: 'Russian', ar: 'Arabic'
+  en: 'English', tr: 'Turkish', de: 'German', ru: 'Russian',
+  es: 'Spanish', fr: 'French', it: 'Italian', pt: 'Portuguese'
 };
 
 // Get suggested topics based on proficiency level
@@ -65,8 +65,38 @@ const getLevelTopics = (level: string) => {
   return topics[level] || topics['B1'];
 };
 
+// Map interest IDs to display format
+const INTEREST_MAP: Record<string, { emoji: string; name: string }> = {
+  'travel': { emoji: '✈️', name: 'Travel' },
+  'food': { emoji: '🍕', name: 'Food & Cooking' },
+  'tech': { emoji: '💻', name: 'Technology' },
+  'sports': { emoji: '⚽', name: 'Sports' },
+  'music': { emoji: '🎵', name: 'Music' },
+  'movies': { emoji: '🎬', name: 'Movies & TV' },
+  'business': { emoji: '💼', name: 'Business' },
+  'science': { emoji: '🔬', name: 'Science' },
+  'art': { emoji: '🎨', name: 'Art & Design' },
+  'fashion': { emoji: '👗', name: 'Fashion' },
+  'gaming': { emoji: '🎮', name: 'Gaming' },
+  'health': { emoji: '🏥', name: 'Health & Fitness' },
+  'nature': { emoji: '🌿', name: 'Nature' },
+  'books': { emoji: '📚', name: 'Books & Reading' },
+  'social': { emoji: '💬', name: 'Social & Culture' },
+};
+
+// Get topics from user interests
+const getInterestTopics = (interests: string[] | null | undefined) => {
+  if (!interests || interests.length === 0) return null;
+
+  return interests.map(id => ({
+    ...INTEREST_MAP[id],
+    cards: 10
+  })).filter(t => t.emoji); // Filter out any invalid interest IDs
+};
+
 const Dashboard: React.FC<DashboardProps> = ({ decks, onStartDeck, onAddDeck, isLoading = false }) => {
   const { profile, user } = useAuth();
+  const { t } = useTranslation();
   const targetLang = profile?.target_lang ? LANGUAGE_NAMES[profile.target_lang] || profile.target_lang : 'Language';
   const level = profile?.proficiency_level || 'B1';
   const [generatingDeck, setGeneratingDeck] = useState<string | null>(null);
@@ -143,13 +173,13 @@ const Dashboard: React.FC<DashboardProps> = ({ decks, onStartDeck, onAddDeck, is
       {/* Header Section */}
       <section className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
         <div>
-          <h1 className="text-4xl font-semibold tracking-tight text-[#1a1a1a]">Your Sanctuary</h1>
+          <h1 className="text-4xl font-semibold tracking-tight text-[#1a1a1a]">{t('dashboard.title')}</h1>
           <div className="flex items-center gap-3 mt-2">
             <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs font-bold">
               <Globe size={12} />
               {targetLang} • {level}
             </span>
-            <p className="text-gray-500 text-sm font-medium tracking-wide">YOUR LANGUAGE JOURNEY</p>
+            <p className="text-gray-500 text-sm font-medium tracking-wide">{t('dashboard.journey')}</p>
           </div>
         </div>
 
@@ -181,17 +211,19 @@ const Dashboard: React.FC<DashboardProps> = ({ decks, onStartDeck, onAddDeck, is
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
             <div>
               <h2 className="text-xl font-bold mb-1">
-                {level} Starter Decks
+                {profile?.interests && profile.interests.length > 0
+                  ? t('dashboard.your_interests')
+                  : `${level} ${t('dashboard.starter_decks')}`}
               </h2>
               <p className="text-gray-500 text-sm">
-                Add pre-made {targetLang} decks for your level
+                {t('dashboard.add_premade')}
               </p>
             </div>
           </div>
 
-          {/* Starter Deck Cards */}
+          {/* Starter Deck Cards - Use interests if available, otherwise level topics */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {getLevelTopics(level).map((topic, i) => {
+            {(getInterestTopics(profile?.interests) || getLevelTopics(level)).map((topic, i) => {
               const alreadyHas = decks.some(d => d.title.includes(topic.name));
               return (
                 <motion.div
@@ -204,22 +236,22 @@ const Dashboard: React.FC<DashboardProps> = ({ decks, onStartDeck, onAddDeck, is
                 >
                   <span className="text-3xl mb-2 block">{topic.emoji}</span>
                   <h4 className="font-bold text-sm">{topic.name}</h4>
-                  <p className="text-xs text-gray-500 mb-3">{topic.cards} words • {level}</p>
+                  <p className="text-xs text-gray-500 mb-3">{topic.cards} {t('dashboard.words')} • {level}</p>
 
                   {alreadyHas ? (
                     <span className="text-xs text-green-600 font-medium flex items-center gap-1">
-                      <CheckCircle2 size={12} /> Added
+                      <CheckCircle2 size={12} />{t('dashboard.added')}
                     </span>
                   ) : generatingDeck === topic.name ? (
                     <span className="text-xs text-blue-600 font-medium flex items-center gap-1">
-                      <Loader2 size={12} className="animate-spin" /> Creating...
+                      <Loader2 size={12} className="animate-spin" />{t('dashboard.creating')}
                     </span>
                   ) : (
                     <button
                       onClick={() => handleAddStarterDeck(topic)}
                       className="w-full bg-blue-500 text-white py-2 rounded-xl text-xs font-bold hover:bg-blue-600 transition-all flex items-center justify-center gap-1"
                     >
-                      <Plus size={14} /> Add Deck
+                      <Plus size={14} />{t('dashboard.add_deck')}
                     </button>
                   )}
                 </motion.div>
@@ -231,16 +263,16 @@ const Dashboard: React.FC<DashboardProps> = ({ decks, onStartDeck, onAddDeck, is
 
       {/* Ongoing Decks Grid */}
       <section>
-        <h2 className="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-6">Your Decks</h2>
+        <h2 className="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-6">{t('dashboard.your_decks')}</h2>
 
         {isLoading ? (
           <div className="text-center py-12">
-            <p className="text-gray-400 text-sm uppercase tracking-widest">Loading your decks...</p>
+            <p className="text-gray-400 text-sm uppercase tracking-widest">{t('dashboard.loading_decks')}</p>
           </div>
         ) : decks.length === 0 ? (
           <div className="text-center py-12 glass rounded-[32px] p-8">
-            <p className="text-gray-600 font-medium mb-2">No decks yet</p>
-            <p className="text-gray-400 text-sm">Head to Explore to generate your first deck!</p>
+            <p className="text-gray-600 font-medium mb-2">{t('dashboard.no_decks')}</p>
+            <p className="text-gray-400 text-sm">{t('dashboard.no_decks_hint')}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
