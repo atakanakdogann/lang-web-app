@@ -123,7 +123,15 @@ export const generateDeck = async (
       - "word": The vocabulary word in ${targetLanguage}
       - "translation": Meaning in ${sourceLanguage}
       - "sample_sentence": Example sentence in ${sourceLanguage} showing how to use the word (for context)
-      - "correct_sentence": A proper sentence in ${targetLanguage} using the word (what user should write)
+      - "correct_sentence": The EXACT translation of sample_sentence in ${targetLanguage} (what user should write)
+      
+      ⚠️ VERY IMPORTANT - CONSISTENCY RULE:
+      The "sample_sentence" and "correct_sentence" MUST be EXACT translations of each other!
+      - They must have the SAME meaning, the SAME structure, and the SAME content
+      - If sample_sentence says "I like listening to music", correct_sentence must also say "I like listening to music" in the target language
+      - DO NOT simplify or shorten the correct_sentence compared to the sample_sentence
+      - DO NOT add extra words or change the meaning between the two
+      - The user will try to translate exactly what they see - if the sentences don't match, the user will be confused and marked wrong unfairly
       
       Example for learning English (target) with Turkish (source) native at B1 level:
       {
@@ -132,6 +140,19 @@ export const generateDeck = async (
         "type": "Noun",
         "sample_sentence": "Bulaşık makinesi 2 saattir çalışıyor",
         "correct_sentence": "The dishwasher has been running for 2 hours"
+      }
+      Note: Both sentences have the EXACT same meaning - one is the precise translation of the other.
+      
+      BAD EXAMPLE (DO NOT DO THIS):
+      {
+        "sample_sentence": "Müzik dinlemeyi severim",  // "I like listening to music"
+        "correct_sentence": "I like music"  // WRONG! This is NOT the same sentence!
+      }
+      
+      GOOD EXAMPLE:
+      {
+        "sample_sentence": "Müzik dinlemeyi severim",  // "I like listening to music"
+        "correct_sentence": "I like listening to music"  // CORRECT! Exact translation!
       }
       
       The user will see the word and example in their native language, then write a sentence in the target language.`,

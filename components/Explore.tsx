@@ -7,6 +7,7 @@ import { deckService } from '../services/deckService';
 import { cardService } from '../services/cardService';
 import { deckStatsService, DeckStats } from '../services/deckStatsService';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import { useTranslation } from '../services/i18n';
 import { Deck, Card } from '../types';
 
@@ -34,6 +35,7 @@ const FEATURED_DECKS = [
 
 const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
   const { user, profile } = useAuth();
+  const toast = useToast();
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
@@ -150,7 +152,7 @@ const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
       setSourceLanguage('English');
     } catch (error) {
       console.error('Generation error:', error);
-      alert("Failed to generate deck. Please try again.");
+      toast.error('Generation Failed', 'Could not generate deck. Please try again.');
     } finally {
       setIsGenerating(false);
     }
@@ -159,11 +161,11 @@ const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
   const handleManualCreate = async () => {
     if (!manualTitle || !manualTargetLang || !user) return;
     if (manualCards.length < 3) {
-      alert("Please create at least 3 cards.");
+      toast.warning('Not Enough Cards', 'Please create at least 3 cards.');
       return;
     }
     if (manualCards.some(c => !c.word || !c.translation || !c.sample_sentence || !c.correct_sentence)) {
-      alert("Please fill in all fields for all cards.");
+      toast.warning('Incomplete Cards', 'Please fill in all fields for all cards.');
       return;
     }
 
@@ -224,7 +226,7 @@ const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
       }
     } catch (error) {
       console.error('Creation error:', error);
-      alert("Failed to create deck. Please try again.");
+      toast.error('Creation Failed', 'Could not create deck. Please try again.');
     } finally {
       setIsCreatingManual(false);
     }
@@ -234,10 +236,10 @@ const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
     if (!user) return;
     try {
       await deckService.cloneDeck(deckId, user.id);
-      alert("Deck cloned to your library! Check Dashboard.");
+      toast.success('Deck Cloned!', 'Deck added to your library. Check Dashboard.');
     } catch (error) {
       console.error('Clone error:', error);
-      alert("Failed to clone deck.");
+      toast.error('Clone Failed', 'Could not clone this deck.');
     }
   };
 

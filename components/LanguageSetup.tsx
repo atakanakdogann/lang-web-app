@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight, ChevronLeft, Globe, BookOpen, Target, Sparkles, Heart } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { useToast } from '../contexts/ToastContext';
 import { useTranslation } from '../services/i18n';
 
 interface LanguageSetupProps {
@@ -48,6 +49,7 @@ const INTERESTS = [
 ];
 
 const LanguageSetup: React.FC<LanguageSetupProps> = ({ userId, onComplete }) => {
+    const toast = useToast();
     const { t, setLanguage } = useTranslation();
     const [step, setStep] = useState(1);
     const [nativeLang, setNativeLang] = useState('');
@@ -94,7 +96,7 @@ const LanguageSetup: React.FC<LanguageSetupProps> = ({ userId, onComplete }) => 
             onComplete();
         } catch (error) {
             console.error('Error saving language preferences:', error);
-            alert('Failed to save preferences. Please try again.');
+            toast.error('Setup Failed', 'Failed to save preferences. Please try again.');
         } finally {
             setIsSaving(false);
         }

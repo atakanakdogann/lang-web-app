@@ -9,6 +9,7 @@ import { cardService } from '../services/cardService';
 import { progressService } from '../services/progressService';
 import { questService } from '../services/questService';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import { useTranslation } from '../services/i18n';
 import DeckRatingModal from './DeckRatingModal';
 
@@ -26,6 +27,7 @@ const LANGUAGE_NAMES: Record<string, string> = {
 
 const StudyMode: React.FC<StudyModeProps> = ({ deck, onExit, onDeckDeleted, onDeckRegenerated }) => {
   const { profile, user } = useAuth();
+  const toast = useToast();
   const { t } = useTranslation();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [inputValue, setInputValue] = useState('');
@@ -195,7 +197,7 @@ const StudyMode: React.FC<StudyModeProps> = ({ deck, onExit, onDeckDeleted, onDe
       onExit();
     } catch (error) {
       console.error('Failed to regenerate deck:', error);
-      alert('Failed to regenerate deck. Please try again.');
+      toast.error('Regeneration Failed', 'Could not regenerate deck. Please try again.');
     } finally {
       setIsRegenerating(false);
     }
@@ -214,7 +216,7 @@ const StudyMode: React.FC<StudyModeProps> = ({ deck, onExit, onDeckDeleted, onDe
       onExit();
     } catch (error) {
       console.error('Failed to delete deck:', error);
-      alert('Failed to delete deck. Please try again.');
+      toast.error('Deletion Failed', 'Could not delete deck. Please try again.');
     } finally {
       setIsDeleting(false);
     }

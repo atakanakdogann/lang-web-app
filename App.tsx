@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard,
@@ -10,21 +10,45 @@ import {
 } from 'lucide-react';
 import { AppView, Deck } from './types';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ToastProvider, useToast } from './contexts/ToastContext';
 import { I18nProvider } from './services/i18n';
 import { deckService } from './services/deckService';
 import { cardService } from './services/cardService';
 import { progressService } from './services/progressService';
-import Dashboard from './components/Dashboard';
-import StudyMode from './components/StudyMode';
-import Explore from './components/Explore';
-import Profile from './components/Profile';
-import Landing from './components/Landing';
-import LanguageSetup from './components/LanguageSetup';
+import ErrorBoundary from './components/ErrorBoundary';
+import { SkeletonDashboard, SkeletonExplore, SkeletonProfile } from './components/Skeleton';
+
+// Lazy load heavy components for code splitting
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const StudyMode = lazy(() => import('./components/StudyMode'));
+const Explore = lazy(() => import('./components/Explore'));
+const Profile = lazy(() => import('./components/Profile'));
+const Landing = lazy(() => import('./components/Landing'));
+const LanguageSetup = lazy(() => import('./components/LanguageSetup'));
 import LanguageSwitcher from './components/LanguageSwitcher';
 import QuestsPanel from './components/QuestsPanel';
 
+// Skeleton fallback components for each view
+const ViewSkeleton: React.FC<{ view: AppView }> = ({ view }) => {
+  switch (view) {
+    case 'Dashboard':
+      return <SkeletonDashboard />;
+    case 'Explore':
+      return <SkeletonExplore />;
+    case 'Profile':
+      return <SkeletonProfile />;
+    default:
+      return (
+        <div className="flex items-center justify-center py-20">
+          <div className="animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full" />
+        </div>
+      );
+  }
+};
+
 const MainApp: React.FC = () => {
   const { user, profile, loading } = useAuth();
+  const toast = useToast();
   const [view, setView] = useState<AppView>('Dashboard');
   const [decks, setDecks] = useState<Deck[]>([]);
   const [activeDeck, setActiveDeck] = useState<Deck | null>(null);
@@ -125,7 +149,7 @@ const MainApp: React.FC = () => {
 
   const startStudy = (deck: Deck) => {
     if (!deck.cards || deck.cards.length === 0) {
-      alert("This deck is empty! Try exploring or generating a custom one.");
+      toast.warning('Empty Deck', 'This deck has no cards. Try exploring or generating a custom one.');
       return;
     }
     setActiveDeck(deck);
@@ -196,16 +220,30 @@ const MainApp: React.FC = () => {
 
   // Show landing page if not authenticated
   if (!user) {
-    return <Landing />;
+    return (
+      <Suspense fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full" />
+        </div>
+      }>
+        <Landing />
+      </Suspense>
+    );
   }
 
   // Show language setup if onboarding not complete
   if (profile && !profile.onboarding_complete) {
     return (
-      <LanguageSetup
-        userId={user.id}
-        onComplete={() => window.location.reload()}
-      />
+      <Suspense fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin h-10 w-10 border-4 border-purple-500 border-t-transparent rounded-full" />
+        </div>
+      }>
+        <LanguageSetup
+          userId={user.id}
+          onComplete={() => window.location.reload()}
+        />
+      </Suspense>
     );
   }
 
@@ -250,7 +288,9 @@ const MainApp: React.FC = () => {
               exit={{ opacity: 0, scale: 0.95, filter: 'blur(10px)' }}
               transition={{ duration: 0.4 }}
             >
-              <Dashboard decks={decks} onStartDeck={startStudy} onAddDeck={handleAddDeck} isLoading={loadingDecks} />
+              <Suspense fallback={<SkeletonDashboard />}>
+                <Dashboard decks={decks} onStartDeck={startStudy} onAddDeck={handleAddDeck} isLoading={loadingDecks} />
+              </Suspense>
             </motion.div>
           )}
 
@@ -263,12 +303,14 @@ const MainApp: React.FC = () => {
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
               className="flex justify-center items-center min-h-[70vh]"
             >
-              <StudyMode
-                deck={activeDeck}
-                onExit={handleExitStudy}
-                onDeckDeleted={handleDeckDeleted}
-                onDeckRegenerated={handleDeckRegenerated}
-              />
+              <Suspense fallback={<ViewSkeleton view="Study" />}>
+                <StudyMode
+                  deck={activeDeck}
+                  onExit={handleExitStudy}
+                  onDeckDeleted={handleDeckDeleted}
+                  onDeckRegenerated={handleDeckRegenerated}
+                />
+              </Suspense>
             </motion.div>
           )}
 
@@ -279,7 +321,9 @@ const MainApp: React.FC = () => {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
             >
-              <Explore onAddDeck={handleAddDeck} />
+              <Suspense fallback={<SkeletonExplore />}>
+                <Explore onAddDeck={handleAddDeck} />
+              </Suspense>
             </motion.div>
           )}
 
@@ -290,7 +334,9 @@ const MainApp: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
             >
-              <Profile />
+              <Suspense fallback={<SkeletonProfile />}>
+                <Profile />
+              </Suspense>
             </motion.div>
           )}
         </AnimatePresence>
@@ -310,11 +356,15 @@ const MainApp: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <I18nProvider>
-      <AuthProvider>
-        <MainApp />
-      </AuthProvider>
-    </I18nProvider>
+    <ErrorBoundary>
+      <I18nProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <MainApp />
+          </AuthProvider>
+        </ToastProvider>
+      </I18nProvider>
+    </ErrorBoundary>
   );
 };
 

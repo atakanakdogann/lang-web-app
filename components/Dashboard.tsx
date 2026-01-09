@@ -5,6 +5,7 @@ import { Play, TrendingUp, CheckCircle2, Flame, Globe, Plus, Loader2 } from 'luc
 import { Deck } from '../types';
 import HealthRings from './HealthRings';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import { useTranslation } from '../services/i18n';
 import { generateDeck } from '../services/geminiService';
 import { deckService } from '../services/deckService';
@@ -96,6 +97,7 @@ const getInterestTopics = (interests: string[] | null | undefined) => {
 
 const Dashboard: React.FC<DashboardProps> = ({ decks, onStartDeck, onAddDeck, isLoading = false }) => {
   const { profile, user } = useAuth();
+  const toast = useToast();
   const { t } = useTranslation();
   const targetLang = profile?.target_lang ? LANGUAGE_NAMES[profile.target_lang] || profile.target_lang : 'Language';
   const level = profile?.proficiency_level || 'B1';
@@ -154,10 +156,10 @@ const Dashboard: React.FC<DashboardProps> = ({ decks, onStartDeck, onAddDeck, is
         }))
       });
 
-      alert(`"${topic.name}" deck added to your collection!`);
+      toast.success('Deck Created!', `"${topic.name}" deck added to your collection!`);
     } catch (error) {
       console.error('Error creating starter deck:', error);
-      alert('Failed to create deck. Please try again.');
+      toast.error('Failed', 'Could not create deck. Please try again.');
     } finally {
       setGeneratingDeck(null);
     }

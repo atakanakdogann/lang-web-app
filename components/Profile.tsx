@@ -7,6 +7,7 @@ import {
   Languages, GraduationCap, Heart
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import { supabase } from '../services/supabaseClient';
 import { profileService, UserStats } from '../services/profileService';
 import { useTranslation } from '../services/i18n';
@@ -43,6 +44,7 @@ type SettingsSection = 'profile' | 'language' | 'interests' | 'security' | 'dang
 
 const Profile: React.FC = () => {
   const { profile, signOut, user, refreshProfile } = useAuth();
+  const toast = useToast();
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'profile' | 'settings'>('profile');
   const [activeSection, setActiveSection] = useState<SettingsSection>('profile');
@@ -128,7 +130,7 @@ const Profile: React.FC = () => {
       window.location.reload();
     } catch (error) {
       console.error('Avatar upload error:', error);
-      alert(t('profile.avatar_error'));
+      toast.error(t('profile.error'), t('profile.avatar_error'));
     } finally {
       setUploadingAvatar(false);
     }
@@ -144,11 +146,11 @@ const Profile: React.FC = () => {
         .eq('id', user.id);
 
       if (error) throw error;
-      alert(t('profile.save_success'));
+      toast.success(t('profile.success'), t('profile.save_success'));
       if (refreshProfile) refreshProfile();
     } catch (error) {
       console.error('Save error:', error);
-      alert(t('profile.save_error'));
+      toast.error(t('profile.error'), t('profile.save_error'));
     } finally {
       setIsSaving(false);
     }
@@ -159,11 +161,11 @@ const Profile: React.FC = () => {
     setIsSaving(true);
     try {
       await profileService.updateLanguageSettings(user.id, selectedNativeLang, selectedTargetLang, selectedLevel);
-      alert(t('profile.save_success'));
+      toast.success(t('profile.success'), t('profile.save_success'));
       if (refreshProfile) refreshProfile();
     } catch (error) {
       console.error('Save error:', error);
-      alert(t('profile.save_error'));
+      toast.error(t('profile.error'), t('profile.save_error'));
     } finally {
       setIsSaving(false);
     }
@@ -174,11 +176,11 @@ const Profile: React.FC = () => {
     setIsSaving(true);
     try {
       await profileService.updateInterests(user.id, selectedInterests);
-      alert(t('profile.save_success'));
+      toast.success(t('profile.success'), t('profile.save_success'));
       if (refreshProfile) refreshProfile();
     } catch (error) {
       console.error('Save error:', error);
-      alert(t('profile.save_error'));
+      toast.error(t('profile.error'), t('profile.save_error'));
     } finally {
       setIsSaving(false);
     }
@@ -192,11 +194,11 @@ const Profile: React.FC = () => {
 
   const handleChangePassword = async () => {
     if (!newPassword || newPassword !== confirmPassword) {
-      alert(t('profile.password_mismatch'));
+      toast.warning(t('profile.warning'), t('profile.password_mismatch'));
       return;
     }
     if (newPassword.length < 6) {
-      alert(t('profile.password_too_short'));
+      toast.warning(t('profile.warning'), t('profile.password_too_short'));
       return;
     }
 
@@ -205,12 +207,12 @@ const Profile: React.FC = () => {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
 
-      alert(t('profile.password_success'));
+      toast.success(t('profile.success'), t('profile.password_success'));
       setNewPassword('');
       setConfirmPassword('');
     } catch (error: any) {
       console.error('Password change error:', error);
-      alert(error.message || t('profile.password_error'));
+      toast.error(t('profile.error'), error.message || t('profile.password_error'));
     } finally {
       setIsSaving(false);
     }
@@ -218,7 +220,7 @@ const Profile: React.FC = () => {
 
   const handleDeleteAccount = async () => {
     if (deleteConfirm !== 'DELETE') {
-      alert(t('profile.delete_type_confirm'));
+      toast.warning(t('profile.warning'), t('profile.delete_type_confirm'));
       return;
     }
 
@@ -230,7 +232,7 @@ const Profile: React.FC = () => {
       await signOut();
     } catch (error) {
       console.error('Delete error:', error);
-      alert(t('profile.delete_error'));
+      toast.error(t('profile.error'), t('profile.delete_error'));
     } finally {
       setIsSaving(false);
     }
@@ -307,8 +309,8 @@ const Profile: React.FC = () => {
           <button
             onClick={() => setActiveTab('profile')}
             className={`px-6 py-2.5 rounded-full font-medium text-sm transition-all ${activeTab === 'profile'
-                ? 'bg-white shadow-md text-gray-900'
-                : 'text-gray-500 hover:text-gray-700'
+              ? 'bg-white shadow-md text-gray-900'
+              : 'text-gray-500 hover:text-gray-700'
               }`}
           >
             {t('profile.tab_profile')}
@@ -316,8 +318,8 @@ const Profile: React.FC = () => {
           <button
             onClick={() => setActiveTab('settings')}
             className={`px-6 py-2.5 rounded-full font-medium text-sm transition-all ${activeTab === 'settings'
-                ? 'bg-white shadow-md text-gray-900'
-                : 'text-gray-500 hover:text-gray-700'
+              ? 'bg-white shadow-md text-gray-900'
+              : 'text-gray-500 hover:text-gray-700'
               }`}
           >
             {t('profile.tab_settings')}
@@ -384,10 +386,10 @@ const Profile: React.FC = () => {
                   <div
                     key={i}
                     className={`w-3 h-3 rounded-sm transition-colors ${h.count === 0 ? 'bg-gray-100' :
-                        h.count <= 2 ? 'bg-blue-200' :
-                          h.count <= 5 ? 'bg-blue-400' :
-                            h.count <= 10 ? 'bg-blue-500' :
-                              'bg-blue-700'
+                      h.count <= 2 ? 'bg-blue-200' :
+                        h.count <= 5 ? 'bg-blue-400' :
+                          h.count <= 10 ? 'bg-blue-500' :
+                            'bg-blue-700'
                       }`}
                     title={`${h.count} cards`}
                   />
@@ -438,8 +440,8 @@ const Profile: React.FC = () => {
                   key={item.id}
                   onClick={() => setActiveSection(item.id)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-left ${activeSection === item.id
-                      ? 'bg-white shadow-md'
-                      : 'hover:bg-white/50'
+                    ? 'bg-white shadow-md'
+                    : 'hover:bg-white/50'
                     }`}
                 >
                   <div className={`w-8 h-8 rounded-lg ${item.color} flex items-center justify-center text-white`}>
@@ -502,8 +504,8 @@ const Profile: React.FC = () => {
                               key={lvl}
                               onClick={() => setSelectedLevel(lvl)}
                               className={`p-3 rounded-xl border-2 font-bold text-sm transition-all ${selectedLevel === lvl
-                                  ? 'border-blue-500 bg-blue-50 text-blue-700'
-                                  : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                                ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                : 'border-gray-200 text-gray-500 hover:border-gray-300'
                                 }`}
                             >
                               {lvl}
@@ -527,8 +529,8 @@ const Profile: React.FC = () => {
                             key={interest.id}
                             onClick={() => toggleInterest(interest.id)}
                             className={`p-3 rounded-xl border-2 transition-all text-center ${selectedInterests.includes(interest.id)
-                                ? 'border-pink-500 bg-pink-50'
-                                : 'border-gray-200 hover:border-gray-300'
+                              ? 'border-pink-500 bg-pink-50'
+                              : 'border-gray-200 hover:border-gray-300'
                               }`}
                           >
                             <span className="text-2xl block mb-1">{interest.emoji}</span>
