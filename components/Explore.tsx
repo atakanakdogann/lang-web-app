@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Sparkles, Plus, Globe, Filter, X, Loader2, Copy, Star, Users, TrendingUp, Clock } from 'lucide-react';
+import { Search, Sparkles, Plus, Globe, Filter, X, Loader2, Copy, Star, Users, TrendingUp, Clock, Wand2, PenLine, ArrowRight } from 'lucide-react';
 import { generateDeck } from '../services/geminiService';
 import { deckService } from '../services/deckService';
 import { cardService } from '../services/cardService';
@@ -16,21 +16,14 @@ interface ExploreProps {
 }
 
 const LANGUAGES = [
-  { code: 'en', name: 'English' },
-  { code: 'tr', name: 'Turkish' },
-  { code: 'de', name: 'German' },
-  { code: 'ru', name: 'Russian' },
-  { code: 'es', name: 'Spanish' },
-  { code: 'fr', name: 'French' },
-  { code: 'it', name: 'Italian' },
-  { code: 'pt', name: 'Portuguese' },
-];
-
-const FEATURED_DECKS = [
-  { id: 'f1', title: 'Kyoto Cafe Phrases', lang: 'Japanese', count: 45, author: 'Sato M.', gradient: 'linear-gradient(135deg, #FF6B6B, #FFD93D)' },
-  { id: 'f2', title: 'Berlin Tech Talk', lang: 'German', count: 120, author: 'Erik K.', gradient: 'linear-gradient(135deg, #4ECDC4, #556270)' },
-  { id: 'f3', title: 'Paris Fashion Week', lang: 'French', count: 88, author: 'Chloé B.', gradient: 'linear-gradient(135deg, #A8E6CF, #DCEDC1)' },
-  { id: 'f4', title: 'Medical Spanish', lang: 'Spanish', count: 350, author: 'Elena R.', gradient: 'linear-gradient(135deg, #D4FC79, #96E6A1)' },
+  { code: 'en', name: 'English', flag: '🇬🇧' },
+  { code: 'tr', name: 'Turkish', flag: '🇹🇷' },
+  { code: 'de', name: 'German', flag: '🇩🇪' },
+  { code: 'ru', name: 'Russian', flag: '🇷🇺' },
+  { code: 'es', name: 'Spanish', flag: '🇪🇸' },
+  { code: 'fr', name: 'French', flag: '🇫🇷' },
+  { code: 'it', name: 'Italian', flag: '🇮🇹' },
+  { code: 'pt', name: 'Portuguese', flag: '🇵🇹' },
 ];
 
 const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
@@ -109,6 +102,7 @@ const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
         source_lang: sourceLanguage,
         target_lang: language,
         is_public: isPublic,
+        is_ai_generated: true,
         cover_gradient: gradient,
       });
 
@@ -178,6 +172,7 @@ const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
         source_lang: manualSourceLang,
         target_lang: manualTargetLang,
         is_public: manualIsPublic,
+        is_ai_generated: false,
         cover_gradient: gradient,
       });
 
@@ -286,37 +281,6 @@ const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
           <FilterChip icon={<Filter size={14} />} label={t('explore.advanced')} />
         </div>
       </header>
-
-      <section>
-        <div className="flex justify-between items-end mb-8">
-          <div>
-            <h2 className="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-2">{t('explore.community_favorites')}</h2>
-            <h3 className="text-2xl font-bold">{t('explore.trending')}</h3>
-          </div>
-          <button className="text-blue-500 text-sm font-bold hover:underline">{t('explore.view_all')}</button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {FEATURED_DECKS.map((deck) => (
-            <motion.div
-              key={deck.id}
-              whileHover={{ scale: 1.02 }}
-              className="glass overflow-hidden rounded-[32px] group cursor-pointer shadow-sm border border-white/40"
-            >
-              <div className="h-40 relative" style={{ background: deck.gradient }}>
-                <div className="absolute inset-0 bg-black/5 group-hover:bg-transparent transition-colors" />
-              </div>
-              <div className="p-6">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-blue-500 mb-1 block">{deck.lang}</span>
-                <h4 className="font-bold text-lg mb-1 tracking-tight">{deck.title}</h4>
-                <div className="flex justify-between items-center mt-4">
-                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{deck.count} CARDS • {deck.author}</p>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </section>
 
       <section className="bg-[#1a1a1a] rounded-[48px] p-12 text-white relative overflow-hidden shadow-2xl">
         <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-blue-500/20 to-purple-500/20 blur-[120px] -z-0" />
@@ -712,9 +676,30 @@ const Explore: React.FC<ExploreProps> = ({ onAddDeck }) => {
                     </div>
 
                     <div className="p-5">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-blue-500 mb-1 block">
-                        {LANGUAGES.find(l => l.code === deck.target_lang)?.name || deck.target_lang}
-                      </span>
+                      {/* Language pair and AI/Manual badge */}
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest">
+                          <span className="text-gray-400">
+                            {LANGUAGES.find(l => l.code === deck.source_lang)?.flag || '🌐'}
+                          </span>
+                          <ArrowRight size={10} className="text-gray-300" />
+                          <span className="text-blue-500">
+                            {LANGUAGES.find(l => l.code === deck.target_lang)?.flag || '🌐'}
+                            {' '}
+                            {LANGUAGES.find(l => l.code === deck.target_lang)?.name || deck.target_lang}
+                          </span>
+                        </div>
+                        <div className={`px-2 py-0.5 rounded-full text-[9px] font-bold flex items-center gap-1 ${deck.is_ai_generated !== false
+                          ? 'bg-purple-100 text-purple-600'
+                          : 'bg-gray-100 text-gray-600'
+                          }`}>
+                          {deck.is_ai_generated !== false ? (
+                            <><Wand2 size={10} /> {t('explore.ai_badge')}</>
+                          ) : (
+                            <><PenLine size={10} /> {t('explore.manual_badge')}</>
+                          )}
+                        </div>
+                      </div>
                       <h4 className="font-bold text-lg mb-3 tracking-tight line-clamp-1">{deck.title}</h4>
 
                       {/* Creator Info */}

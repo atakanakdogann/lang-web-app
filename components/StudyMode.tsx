@@ -8,6 +8,7 @@ import { deckService } from '../services/deckService';
 import { cardService } from '../services/cardService';
 import { progressService } from '../services/progressService';
 import { questService } from '../services/questService';
+import { profileService } from '../services/profileService';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { useTranslation } from '../services/i18n';
@@ -115,6 +116,10 @@ const StudyMode: React.FC<StudyModeProps> = ({ deck, onExit, onDeckDeleted, onDe
         await progressService.saveCardRating(user.id, currentCard.id, analysis.rating);
         // Track quest progress
         await questService.recordCardStudy(user.id, analysis.rating);
+        // Increment cumulative words learned count (never decreases)
+        await profileService.incrementWordsLearned(user.id, 1);
+        // Update streak
+        await profileService.updateStreak(user.id);
       } catch (error) {
         console.error('Failed to save rating:', error);
       }
@@ -203,10 +208,19 @@ const StudyMode: React.FC<StudyModeProps> = ({ deck, onExit, onDeckDeleted, onDe
     }
   };
 
-  // Finish: Delete deck and exit
+  // Finish: Remove deck from collection (only delete from DB if private/owned)
   const handleFinish = async () => {
     if (!user || isDeleting) return;
 
+    // For public decks, just remove from local state, don't delete from DB
+    if (deck.is_public) {
+      if (!confirm(t('study.confirm_remove'))) return;
+      onDeckDeleted?.(deck.id);
+      onExit();
+      return;
+    }
+
+    // For private decks, actually delete from database
     if (!confirm(t('study.confirm_delete'))) return;
 
     setIsDeleting(true);

@@ -16,8 +16,11 @@ export interface Deck {
   progress: number;
   gradient: string;
   cards: Card[];
-  averageRating?: number; // Average star rating from completed cards
-  cardsStudied?: number; // Number of cards studied
+  averageRating?: number;
+  cardsStudied?: number;
+  is_public?: boolean;
+  created_by?: string;
+  target_lang?: string;
 }
 
 export type AppView = 'Dashboard' | 'Study' | 'Explore' | 'Profile';
@@ -36,6 +39,7 @@ export interface User {
   email?: string;
   is_pro: boolean;
   streak_days: number;
+  total_words_learned?: number; // Cumulative count, never decreases
   avatar_url?: string;
   bio?: string;
   native_lang?: string;
@@ -52,6 +56,7 @@ export interface DBDeck {
   source_lang: string;
   target_lang: string;
   is_public: boolean;
+  is_ai_generated?: boolean;
   cover_gradient: string;
   created_at?: string;
 }

@@ -55,7 +55,6 @@ const Profile: React.FC = () => {
 
   // Settings states
   const [editedUsername, setEditedUsername] = useState(profile?.username || '');
-  const [editedBio, setEditedBio] = useState(profile?.bio || '');
   const [selectedNativeLang, setSelectedNativeLang] = useState(profile?.native_lang || 'en');
   const [selectedTargetLang, setSelectedTargetLang] = useState(profile?.target_lang || 'en');
   const [selectedLevel, setSelectedLevel] = useState(profile?.proficiency_level || 'B1');
@@ -77,7 +76,6 @@ const Profile: React.FC = () => {
   useEffect(() => {
     if (profile) {
       setEditedUsername(profile.username || '');
-      setEditedBio(profile.bio || '');
       setSelectedNativeLang(profile.native_lang || 'en');
       setSelectedTargetLang(profile.target_lang || 'en');
       setSelectedLevel(profile.proficiency_level || 'B1');
@@ -142,7 +140,7 @@ const Profile: React.FC = () => {
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ username: editedUsername, bio: editedBio })
+        .update({ username: editedUsername })
         .eq('id', user.id);
 
       if (error) throw error;
@@ -457,22 +455,58 @@ const Profile: React.FC = () => {
               <AnimatePresence mode="wait">
                 {activeSection === 'profile' && (
                   <SettingsPanel key="profile" title={t('profile.section_profile')}>
-                    <div className="space-y-5">
+                    <div className="space-y-6">
+                      {/* Profile Picture */}
+                      <div className="flex items-center gap-6">
+                        <div className="relative">
+                          <div className="w-24 h-24 rounded-full overflow-hidden bg-gradient-to-br from-blue-400 to-purple-600 flex items-center justify-center text-white text-3xl font-bold">
+                            {profile?.avatar_url ? (
+                              <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                            ) : (
+                              profile?.username?.charAt(0).toUpperCase() || 'U'
+                            )}
+                          </div>
+                          {uploadingAvatar && (
+                            <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
+                              <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <label className="cursor-pointer">
+                            <input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
+                            <span className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-xl text-sm font-medium hover:bg-blue-600 transition-colors">
+                              <Camera size={16} />
+                              {profile?.avatar_url ? t('profile.change_photo') : t('profile.upload_photo')}
+                            </span>
+                          </label>
+                          {profile?.avatar_url && (
+                            <button
+                              onClick={async () => {
+                                if (!user) return;
+                                try {
+                                  await supabase.from('profiles').update({ avatar_url: null }).eq('id', user.id);
+                                  toast.success(t('profile.success'), t('profile.photo_removed'));
+                                  if (refreshProfile) refreshProfile();
+                                } catch (error) {
+                                  toast.error(t('profile.error'), t('profile.remove_error'));
+                                }
+                              }}
+                              className="inline-flex items-center gap-2 px-4 py-2 border border-red-200 text-red-600 rounded-xl text-sm font-medium hover:bg-red-50 transition-colors"
+                            >
+                              <Trash2 size={16} />
+                              {t('profile.remove_photo')}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Username */}
                       <InputField
                         label={t('profile.username')}
                         value={editedUsername}
                         onChange={setEditedUsername}
                       />
-                      <div>
-                        <label className="text-sm font-medium text-gray-700 block mb-2">{t('profile.bio')}</label>
-                        <textarea
-                          value={editedBio}
-                          onChange={(e) => setEditedBio(e.target.value)}
-                          placeholder={t('profile.bio_placeholder')}
-                          rows={3}
-                          className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
-                        />
-                      </div>
                       <SaveButton onClick={handleSaveProfile} loading={isSaving} />
                     </div>
                   </SettingsPanel>

@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Play, TrendingUp, CheckCircle2, Flame, Globe, Plus, Loader2 } from 'lucide-react';
+import { Play, TrendingUp, CheckCircle2, Flame, Globe, Plus, Loader2, ChevronDown, Check } from 'lucide-react';
 import { Deck } from '../types';
 import HealthRings from './HealthRings';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,6 +10,7 @@ import { useTranslation } from '../services/i18n';
 import { generateDeck } from '../services/geminiService';
 import { deckService } from '../services/deckService';
 import { cardService } from '../services/cardService';
+import { profileService } from '../services/profileService';
 
 interface DashboardProps {
   decks: Deck[];
@@ -95,13 +96,71 @@ const getInterestTopics = (interests: string[] | null | undefined) => {
   })).filter(t => t.emoji); // Filter out any invalid interest IDs
 };
 
+const LANGUAGES = [
+  { code: 'en', name: 'English', flag: '🇬🇧' },
+  { code: 'tr', name: 'Turkish', flag: '🇹🇷' },
+  { code: 'de', name: 'German', flag: '🇩🇪' },
+  { code: 'ru', name: 'Russian', flag: '🇷🇺' },
+  { code: 'es', name: 'Spanish', flag: '🇪🇸' },
+  { code: 'fr', name: 'French', flag: '🇫🇷' },
+  { code: 'it', name: 'Italian', flag: '🇮🇹' },
+  { code: 'pt', name: 'Portuguese', flag: '🇵🇹' },
+];
+
+const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+
 const Dashboard: React.FC<DashboardProps> = ({ decks, onStartDeck, onAddDeck, isLoading = false }) => {
-  const { profile, user } = useAuth();
+  const { profile, user, refreshProfile } = useAuth();
   const toast = useToast();
   const { t } = useTranslation();
   const targetLang = profile?.target_lang ? LANGUAGE_NAMES[profile.target_lang] || profile.target_lang : 'Language';
   const level = profile?.proficiency_level || 'B1';
   const [generatingDeck, setGeneratingDeck] = useState<string | null>(null);
+  const [showLangDropdown, setShowLangDropdown] = useState(false);
+  const [showLevelDropdown, setShowLevelDropdown] = useState(false);
+  const [savingPrefs, setSavingPrefs] = useState(false);
+
+  const handleLanguageChange = async (langCode: string) => {
+    if (!user || !profile) return;
+    setSavingPrefs(true);
+    setShowLangDropdown(false);
+    try {
+      await profileService.updateLanguageSettings(
+        user.id,
+        profile.native_lang || 'en',
+        langCode,
+        profile.proficiency_level || 'B1'
+      );
+      toast.success(t('dashboard.prefs_saved'), t('dashboard.lang_updated'));
+      if (refreshProfile) refreshProfile();
+    } catch (error) {
+      console.error('Failed to update language:', error);
+      toast.error('Error', 'Failed to update language');
+    } finally {
+      setSavingPrefs(false);
+    }
+  };
+
+  const handleLevelChange = async (newLevel: string) => {
+    if (!user || !profile) return;
+    setSavingPrefs(true);
+    setShowLevelDropdown(false);
+    try {
+      await profileService.updateLanguageSettings(
+        user.id,
+        profile.native_lang || 'en',
+        profile.target_lang || 'en',
+        newLevel
+      );
+      toast.success(t('dashboard.prefs_saved'), t('dashboard.level_updated'));
+      if (refreshProfile) refreshProfile();
+    } catch (error) {
+      console.error('Failed to update level:', error);
+      toast.error('Error', 'Failed to update level');
+    } finally {
+      setSavingPrefs(false);
+    }
+  };
 
   const handleAddStarterDeck = async (topic: { emoji: string; name: string }) => {
     if (!user || !profile) return;
@@ -124,6 +183,7 @@ const Dashboard: React.FC<DashboardProps> = ({ decks, onStartDeck, onAddDeck, is
         source_lang: profile.native_lang || 'en',
         target_lang: profile.target_lang || 'en',
         is_public: false,
+        is_ai_generated: true,
         cover_gradient: gradient,
       });
 
@@ -143,6 +203,7 @@ const Dashboard: React.FC<DashboardProps> = ({ decks, onStartDeck, onAddDeck, is
         id: newDeck.id,
         title: newDeck.title,
         language: newDeck.target_lang,
+        target_lang: newDeck.target_lang, // Include for "Added" check
         progress: 0,
         gradient: newDeck.cover_gradient,
         cards: generatedCards.map((c: any, i: number) => ({
@@ -176,11 +237,63 @@ const Dashboard: React.FC<DashboardProps> = ({ decks, onStartDeck, onAddDeck, is
       <section className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
         <div>
           <h1 className="text-4xl font-semibold tracking-tight text-[#1a1a1a]">{t('dashboard.title')}</h1>
-          <div className="flex items-center gap-3 mt-2">
-            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs font-bold">
-              <Globe size={12} />
-              {targetLang} • {level}
-            </span>
+          <div className="flex items-center gap-2 mt-3 flex-wrap">
+            {/* Language Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => { setShowLangDropdown(!showLangDropdown); setShowLevelDropdown(false); }}
+                disabled={savingPrefs}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs font-bold hover:opacity-90 transition-opacity disabled:opacity-70"
+              >
+                <Globe size={12} />
+                {targetLang}
+                <ChevronDown size={12} />
+              </button>
+              {showLangDropdown && (
+                <div className="absolute top-full left-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50 min-w-[160px]">
+                  {LANGUAGES.map(lang => (
+                    <button
+                      key={lang.code}
+                      onClick={() => handleLanguageChange(lang.code)}
+                      className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 ${profile?.target_lang === lang.code ? 'text-blue-600 font-medium' : 'text-gray-700'
+                        }`}
+                    >
+                      <span>{lang.flag}</span>
+                      <span>{lang.name}</span>
+                      {profile?.target_lang === lang.code && <Check size={14} className="ml-auto text-blue-500" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Level Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => { setShowLevelDropdown(!showLevelDropdown); setShowLangDropdown(false); }}
+                disabled={savingPrefs}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-100 text-gray-700 text-xs font-bold hover:bg-gray-200 transition-colors disabled:opacity-70"
+              >
+                {level}
+                <ChevronDown size={12} />
+              </button>
+              {showLevelDropdown && (
+                <div className="absolute top-full left-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50 min-w-[80px]">
+                  {LEVELS.map(lvl => (
+                    <button
+                      key={lvl}
+                      onClick={() => handleLevelChange(lvl)}
+                      className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between ${level === lvl ? 'text-blue-600 font-medium' : 'text-gray-700'
+                        }`}
+                    >
+                      {lvl}
+                      {level === lvl && <Check size={14} className="text-blue-500" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <p className="text-gray-500 text-sm font-medium tracking-wide">{t('dashboard.journey')}</p>
           </div>
         </div>
@@ -226,7 +339,10 @@ const Dashboard: React.FC<DashboardProps> = ({ decks, onStartDeck, onAddDeck, is
           {/* Starter Deck Cards - Use interests if available, otherwise level topics */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {(getInterestTopics(profile?.interests) || getLevelTopics(level)).map((topic, i) => {
-              const alreadyHas = decks.some(d => d.title.includes(topic.name));
+              // Check if deck with same topic AND same target language exists
+              const alreadyHas = decks.some(d =>
+                d.title.includes(topic.name) && d.target_lang === profile?.target_lang
+              );
               return (
                 <motion.div
                   key={i}
