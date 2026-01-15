@@ -19,8 +19,11 @@ export interface Deck {
   averageRating?: number;
   cardsStudied?: number;
   is_public?: boolean;
+  is_ai_generated?: boolean;
   created_by?: string;
+  source_lang?: string;
   target_lang?: string;
+  level?: string;
 }
 
 export type AppView = 'Dashboard' | 'Study' | 'Explore' | 'Profile';
@@ -57,6 +60,7 @@ export interface DBDeck {
   target_lang: string;
   is_public: boolean;
   is_ai_generated?: boolean;
+  level?: string;
   cover_gradient: string;
   created_at?: string;
 }

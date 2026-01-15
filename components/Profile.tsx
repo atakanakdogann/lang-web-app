@@ -372,35 +372,86 @@ const Profile: React.FC = () => {
               />
             </section>
 
-            {/* Learning Heatmap */}
+            {/* 7-Day Activity Chart (Apple Health Style) */}
             <section className="glass p-8 rounded-[32px]">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="font-bold text-lg">{t('profile.learning_consistency')}</h2>
-                <span className="text-xs text-gray-400 font-bold uppercase tracking-widest">{t('profile.past_months')}</span>
+                <span className="text-xs text-gray-400 font-bold uppercase tracking-widest">{t('profile.last_7_days')}</span>
               </div>
 
-              <div className="grid grid-flow-col grid-rows-7 gap-1 overflow-x-auto pb-2">
-                {heatmap.map((h, i) => (
-                  <div
-                    key={i}
-                    className={`w-3 h-3 rounded-sm transition-colors ${h.count === 0 ? 'bg-gray-100' :
-                      h.count <= 2 ? 'bg-blue-200' :
-                        h.count <= 5 ? 'bg-blue-400' :
-                          h.count <= 10 ? 'bg-blue-500' :
-                            'bg-blue-700'
-                      }`}
-                    title={`${h.count} cards`}
-                  />
-                ))}
+              {/* Bar Chart */}
+              <div className="flex items-end justify-between gap-2 h-32 mb-4">
+                {(() => {
+                  // Get last 7 days from practiceHistory
+                  const today = new Date();
+                  const last7Days = Array.from({ length: 7 }, (_, i) => {
+                    const date = new Date(today);
+                    date.setDate(date.getDate() - (6 - i));
+                    return date.toISOString().split('T')[0];
+                  });
+
+                  // Get counts for each day
+                  const dayData = last7Days.map(dateStr => {
+                    const entry = stats?.practiceHistory?.find(h => h.date === dateStr);
+                    return {
+                      date: dateStr,
+                      count: entry?.count || 0,
+                      dayName: new Date(dateStr).toLocaleDateString('en-US', { weekday: 'short' })
+                    };
+                  });
+
+                  // Find max for scaling
+                  const maxCount = Math.max(...dayData.map(d => d.count), 1);
+
+                  return dayData.map((day, i) => {
+                    const heightPercent = (day.count / maxCount) * 100;
+                    const isToday = i === 6;
+
+                    return (
+                      <div key={day.date} className="flex-1 flex flex-col items-center gap-2">
+                        {/* Count label on top */}
+                        {day.count > 0 && (
+                          <span className="text-xs font-bold text-gray-600">{day.count}</span>
+                        )}
+                        {/* Bar */}
+                        <div className="w-full flex-1 flex items-end">
+                          <motion.div
+                            initial={{ height: 0 }}
+                            animate={{ height: `${Math.max(heightPercent, 4)}%` }}
+                            transition={{ duration: 0.5, delay: i * 0.05 }}
+                            className={`w-full rounded-t-lg ${day.count === 0
+                                ? 'bg-gray-100'
+                                : isToday
+                                  ? 'bg-gradient-to-t from-blue-600 to-blue-400'
+                                  : 'bg-gradient-to-t from-blue-400 to-blue-300'
+                              }`}
+                            style={{ minHeight: day.count === 0 ? '4px' : undefined }}
+                          />
+                        </div>
+                        {/* Day label */}
+                        <span className={`text-xs font-medium ${isToday ? 'text-blue-600' : 'text-gray-400'}`}>
+                          {day.dayName}
+                        </span>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
 
-              <div className="flex justify-end gap-2 items-center mt-4 text-xs text-gray-400">
-                <span>{t('profile.less')}</span>
-                <div className="w-2.5 h-2.5 rounded-sm bg-gray-100" />
-                <div className="w-2.5 h-2.5 rounded-sm bg-blue-200" />
-                <div className="w-2.5 h-2.5 rounded-sm bg-blue-400" />
-                <div className="w-2.5 h-2.5 rounded-sm bg-blue-600" />
-                <span>{t('profile.more')}</span>
+              {/* Summary */}
+              <div className="flex justify-between items-center pt-4 border-t border-gray-100">
+                <div>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {stats?.practiceHistory?.slice(-7).reduce((sum, h) => sum + h.count, 0) || 0}
+                  </p>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider">{t('profile.cards_this_week')}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-2xl font-bold text-blue-600">
+                    {stats?.practiceHistory?.slice(-7).filter(h => h.count > 0).length || 0}/7
+                  </p>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider">{t('profile.days_active')}</p>
+                </div>
               </div>
             </section>
 

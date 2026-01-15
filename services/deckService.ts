@@ -124,9 +124,10 @@ export const deckService = {
             .from('decks')
             .insert({
                 created_by: userId,
-                title: `${sourceDeck.title} (Copy)`,
+                title: sourceDeck.title,
                 source_lang: sourceDeck.source_lang,
                 target_lang: sourceDeck.target_lang,
+                level: sourceDeck.level,
                 is_public: false,
                 cover_gradient: sourceDeck.cover_gradient,
             })

@@ -161,6 +161,7 @@ const Dashboard: React.FC<DashboardProps> = ({ decks, onStartDeck, onAddDeck, is
         target_lang: aiTargetLang,
         is_public: aiIsPublic,
         is_ai_generated: true,
+        level: profile?.proficiency_level || 'B1',
         cover_gradient: gradient,
       });
 
@@ -179,7 +180,9 @@ const Dashboard: React.FC<DashboardProps> = ({ decks, onStartDeck, onAddDeck, is
         id: newDeck.id,
         title: newDeck.title,
         language: newDeck.target_lang,
+        source_lang: aiSourceLang,
         target_lang: newDeck.target_lang,
+        level: profile?.proficiency_level || 'B1',
         is_public: aiIsPublic,
         created_by: user.id,
         progress: 0,
@@ -243,6 +246,7 @@ const Dashboard: React.FC<DashboardProps> = ({ decks, onStartDeck, onAddDeck, is
         target_lang: manualTargetLang,
         is_public: manualIsPublic,
         is_ai_generated: false,
+        level: profile?.proficiency_level || 'B1',
         cover_gradient: gradient,
       });
 
@@ -264,7 +268,9 @@ const Dashboard: React.FC<DashboardProps> = ({ decks, onStartDeck, onAddDeck, is
         id: newDeck.id,
         title: newDeck.title,
         language: newDeck.target_lang,
+        source_lang: manualSourceLang,
         target_lang: newDeck.target_lang,
+        level: profile?.proficiency_level || 'B1',
         is_public: manualIsPublic,
         created_by: user.id,
         progress: 0,
@@ -352,11 +358,12 @@ const Dashboard: React.FC<DashboardProps> = ({ decks, onStartDeck, onAddDeck, is
       const gradient = `linear-gradient(135deg, ${getRandomColor()}, ${getRandomColor()})`;
       const newDeck = await deckService.createDeck({
         created_by: user.id,
-        title: `${topic.emoji} ${topic.name} (${level})`,
+        title: `${topic.emoji} ${topic.name}`,
         source_lang: profile.native_lang || 'en',
         target_lang: profile.target_lang || 'en',
         is_public: false,
         is_ai_generated: true,
+        level: profile.proficiency_level || 'B1',
         cover_gradient: gradient,
       });
 
@@ -371,12 +378,14 @@ const Dashboard: React.FC<DashboardProps> = ({ decks, onStartDeck, onAddDeck, is
       }));
       await cardService.createCards(cardsToInsert);
 
-      // Add to local state
+      // Add to local state with level
       onAddDeck({
         id: newDeck.id,
         title: newDeck.title,
         language: newDeck.target_lang,
-        target_lang: newDeck.target_lang, // Include for "Added" check
+        source_lang: profile.native_lang || 'en',
+        target_lang: newDeck.target_lang,
+        level: profile.proficiency_level || 'B1',
         progress: 0,
         gradient: newDeck.cover_gradient,
         cards: generatedCards.map((c: any, i: number) => ({
@@ -584,8 +593,17 @@ const Dashboard: React.FC<DashboardProps> = ({ decks, onStartDeck, onAddDeck, is
 
                 <div className="relative h-full p-8 flex flex-col justify-between text-white">
                   <div>
-                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-80">{deck.language}</span>
-                    <h3 className="text-2xl font-bold mt-1 tracking-tight">{deck.title}</h3>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-80">
+                        {LANGUAGES.find(l => l.code === deck.source_lang)?.flag || '🌐'} → {LANGUAGES.find(l => l.code === deck.target_lang)?.flag || '🌐'} {deck.language}
+                      </span>
+                      {deck.level && (
+                        <span className="px-2 py-0.5 bg-white/20 backdrop-blur-sm rounded-full text-[9px] font-bold">
+                          {deck.level}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-2xl font-bold tracking-tight">{deck.title}</h3>
                   </div>
 
                   <div className="flex items-center justify-between">
