@@ -20,7 +20,13 @@ export const deckService = {
     /**
      * Get all public decks (community and official) with creator info
      */
-    async getPublicDecks(): Promise<any[]> {
+    /**
+     * Get public decks with pagination
+     */
+    async getPublicDecks(limit: number = 20, page: number = 0): Promise<any[]> {
+        const from = page * limit;
+        const to = from + limit - 1;
+
         const { data, error } = await supabase
             .from('decks')
             .select(`
@@ -31,7 +37,29 @@ export const deckService = {
                 )
             `)
             .eq('is_public', true)
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .range(from, to);
+
+        if (error) throw error;
+        return data || [];
+    },
+
+    /**
+     * Get specific decks by ID (for popular/top rated views)
+     */
+    async getDecksByIds(deckIds: string[]): Promise<any[]> {
+        if (deckIds.length === 0) return [];
+
+        const { data, error } = await supabase
+            .from('decks')
+            .select(`
+                *,
+                profiles!created_by (
+                    username,
+                    avatar_url
+                )
+            `)
+            .in('id', deckIds);
 
         if (error) throw error;
         return data || [];

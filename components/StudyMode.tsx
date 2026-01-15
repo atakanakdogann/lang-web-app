@@ -114,12 +114,12 @@ const StudyMode: React.FC<StudyModeProps> = ({ deck, onExit, onDeckDeleted, onDe
     if (analysis && analysis.rating && user && currentCard) {
       try {
         await progressService.saveCardRating(user.id, currentCard.id, analysis.rating);
+        // Update streak FIRST before any other service updates the last_practice_date
+        await profileService.updateStreak(user.id);
         // Track quest progress
         await questService.recordCardStudy(user.id, analysis.rating);
         // Increment cumulative words learned count (never decreases)
         await profileService.incrementWordsLearned(user.id, 1);
-        // Update streak
-        await profileService.updateStreak(user.id);
       } catch (error) {
         console.error('Failed to save rating:', error);
       }

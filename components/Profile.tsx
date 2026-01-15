@@ -366,8 +366,8 @@ const Profile: React.FC = () => {
               />
               <StatCard
                 icon={<Target size={20} />}
-                label={t('profile.mastery')}
-                value={loadingStats ? '...' : `${masteryRate}%`}
+                label={t('profile.decks_finished')}
+                value={loadingStats ? '...' : (stats?.totalDecksCompleted || 0).toString()}
                 color="bg-emerald-500"
               />
             </section>

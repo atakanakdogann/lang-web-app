@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Play, TrendingUp, CheckCircle2, Flame, Globe, Plus, Loader2, ChevronDown, Check } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Play, TrendingUp, CheckCircle2, Flame, Globe, Plus, Loader2, ChevronDown, Check, Sparkles, X, Trash2 } from 'lucide-react';
 import { Deck } from '../types';
 import HealthRings from './HealthRings';
 import { useAuth } from '../contexts/AuthContext';
@@ -119,6 +119,179 @@ const Dashboard: React.FC<DashboardProps> = ({ decks, onStartDeck, onAddDeck, is
   const [showLangDropdown, setShowLangDropdown] = useState(false);
   const [showLevelDropdown, setShowLevelDropdown] = useState(false);
   const [savingPrefs, setSavingPrefs] = useState(false);
+
+  // AI Deck Creation Modal States
+  const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+  const [aiTopic, setAiTopic] = useState('');
+  const [aiTargetLang, setAiTargetLang] = useState(profile?.target_lang || '');
+  const [aiSourceLang, setAiSourceLang] = useState(profile?.native_lang || 'en');
+  const [aiIsPublic, setAiIsPublic] = useState(true); // Default to public
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+
+  // Manual Deck Creation Modal States
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+  const [manualTitle, setManualTitle] = useState('');
+  const [manualTargetLang, setManualTargetLang] = useState(profile?.target_lang || '');
+  const [manualSourceLang, setManualSourceLang] = useState(profile?.native_lang || 'en');
+  const [manualIsPublic, setManualIsPublic] = useState(true); // Default to public
+  const [isCreatingManual, setIsCreatingManual] = useState(false);
+  const [manualCards, setManualCards] = useState<Array<{
+    word: string;
+    translation: string;
+    type: string;
+    sample_sentence: string;
+  }>>([{ word: '', translation: '', type: 'Noun', sample_sentence: '' }]);
+
+  const handleAIGenerate = async () => {
+    if (!aiTopic || !aiTargetLang || !user) return;
+    setIsGeneratingAI(true);
+    try {
+      const generatedCards = await generateDeck(
+        aiTopic,
+        aiTargetLang,
+        aiSourceLang,
+        profile?.proficiency_level || 'B1'
+      );
+
+      const gradient = `linear-gradient(135deg, ${getRandomColor()}, ${getRandomColor()})`;
+      const newDeck = await deckService.createDeck({
+        created_by: user.id,
+        title: aiTopic.charAt(0).toUpperCase() + aiTopic.slice(1),
+        source_lang: aiSourceLang,
+        target_lang: aiTargetLang,
+        is_public: aiIsPublic,
+        is_ai_generated: true,
+        cover_gradient: gradient,
+      });
+
+      const cardsToInsert = generatedCards.map((c: any) => ({
+        deck_id: newDeck.id,
+        word: c.word,
+        translation: c.translation,
+        type: c.type,
+        sample_sentence: c.sample_sentence,
+        ai_context: c.correct_sentence || null,
+      }));
+
+      const createdCards = await cardService.createCards(cardsToInsert);
+
+      const localDeck: Deck = {
+        id: newDeck.id,
+        title: newDeck.title,
+        language: newDeck.target_lang,
+        target_lang: newDeck.target_lang,
+        is_public: aiIsPublic,
+        created_by: user.id,
+        progress: 0,
+        gradient: newDeck.cover_gradient,
+        cards: createdCards.map((c: any) => ({
+          id: c.id,
+          word: c.word,
+          translation: c.translation,
+          type: c.type,
+          sample_sentence: c.sample_sentence,
+          correct_sentence: c.ai_context,
+          difficulty: 'New' as const
+        }))
+      };
+
+      onAddDeck(localDeck);
+      setIsAIModalOpen(false);
+      setAiTopic('');
+      setAiIsPublic(true);
+      toast.success(t('dashboard.deck_created'), t('dashboard.deck_created_desc'));
+    } catch (error) {
+      console.error('AI generation error:', error);
+      toast.error('Generation Failed', 'Could not create deck. Please try again.');
+    } finally {
+      setIsGeneratingAI(false);
+    }
+  };
+
+  const addManualCard = () => {
+    setManualCards([...manualCards, { word: '', translation: '', type: 'Noun', sample_sentence: '' }]);
+  };
+
+  const removeManualCard = (index: number) => {
+    if (manualCards.length > 1) {
+      setManualCards(manualCards.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateManualCard = (index: number, field: string, value: string) => {
+    const updated = [...manualCards];
+    updated[index] = { ...updated[index], [field]: value };
+    setManualCards(updated);
+  };
+
+  const handleManualCreate = async () => {
+    if (!manualTitle || !manualTargetLang || !user) return;
+
+    const validCards = manualCards.filter(c => c.word && c.translation);
+    if (validCards.length === 0) {
+      toast.warning('No Cards', 'Please add at least one card with word and translation.');
+      return;
+    }
+
+    setIsCreatingManual(true);
+    try {
+      const gradient = `linear-gradient(135deg, ${getRandomColor()}, ${getRandomColor()})`;
+      const newDeck = await deckService.createDeck({
+        created_by: user.id,
+        title: manualTitle,
+        source_lang: manualSourceLang,
+        target_lang: manualTargetLang,
+        is_public: manualIsPublic,
+        is_ai_generated: false,
+        cover_gradient: gradient,
+      });
+
+      const cardsToInsert = validCards.map((c) => ({
+        deck_id: newDeck.id,
+        word: c.word,
+        translation: c.translation,
+        type: c.type,
+        sample_sentence: c.sample_sentence,
+        ai_context: null,
+      }));
+
+      await cardService.createCards(cardsToInsert);
+
+      // Fetch the actual cards with real IDs from database
+      const createdCards = await cardService.getCardsForDeck(newDeck.id);
+
+      const localDeck: Deck = {
+        id: newDeck.id,
+        title: newDeck.title,
+        language: newDeck.target_lang,
+        target_lang: newDeck.target_lang,
+        is_public: manualIsPublic,
+        created_by: user.id,
+        progress: 0,
+        gradient: newDeck.cover_gradient,
+        cards: createdCards.map((c) => ({
+          id: c.id,
+          word: c.word,
+          translation: c.translation,
+          type: c.type as any,
+          sample_sentence: c.sample_sentence,
+          difficulty: 'New' as const
+        }))
+      };
+
+      onAddDeck(localDeck);
+      setIsManualModalOpen(false);
+      setManualTitle('');
+      setManualCards([{ word: '', translation: '', type: 'Noun', sample_sentence: '' }]);
+      setManualIsPublic(true);
+      toast.success(t('dashboard.deck_created'), t('dashboard.deck_created_desc'));
+    } catch (error) {
+      console.error('Manual creation error:', error);
+      toast.error('Creation Failed', 'Could not create deck. Please try again.');
+    } finally {
+      setIsCreatingManual(false);
+    }
+  };
 
   const handleLanguageChange = async (langCode: string) => {
     if (!user || !profile) return;
@@ -449,39 +622,317 @@ const Dashboard: React.FC<DashboardProps> = ({ decks, onStartDeck, onAddDeck, is
         )}
       </section>
 
-      {/* Daily Goals */}
+      {/* Create New Deck Section */}
       <section>
-        <h2 className="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-6">Daily Quests</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="glass p-6 rounded-[24px] flex items-center gap-4 border-white/40">
-            <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600">
-              <CheckCircle2 size={20} />
+        <h2 className="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-6">{t('dashboard.create_deck')}</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setIsAIModalOpen(true)}
+            className="glass p-6 rounded-[24px] flex items-center gap-4 border-white/40 text-left hover:shadow-lg transition-shadow"
+          >
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white">
+              <Sparkles size={24} />
             </div>
             <div>
-              <p className="text-sm font-semibold">Review 20 cards</p>
-              <p className="text-[11px] text-gray-400">12 / 20 COMPLETED</p>
+              <p className="text-base font-semibold">{t('dashboard.ai_generate')}</p>
+              <p className="text-[11px] text-gray-400 uppercase tracking-wider">{t('dashboard.ai_generate_desc')}</p>
             </div>
-          </div>
-          <div className="glass p-6 rounded-[24px] flex items-center gap-4 border-white/40">
-            <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center text-purple-600">
-              <TrendingUp size={20} />
-            </div>
-            <div>
-              <p className="text-sm font-semibold">90% Accuracy Rate</p>
-              <p className="text-[11px] text-gray-400">CURRENT: 88%</p>
-            </div>
-          </div>
-          <div className="glass p-6 rounded-[24px] flex items-center gap-4 border-white/40">
-            <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600">
-              <Flame size={20} />
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setIsManualModalOpen(true)}
+            className="glass p-6 rounded-[24px] flex items-center gap-4 border-white/40 text-left hover:shadow-lg transition-shadow"
+          >
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-teal-600 flex items-center justify-center text-white">
+              <Plus size={24} />
             </div>
             <div>
-              <p className="text-sm font-semibold">Maintain Streak</p>
-              <p className="text-[11px] text-gray-400">DAY 14 OF 20</p>
+              <p className="text-base font-semibold">{t('dashboard.manual_create')}</p>
+              <p className="text-[11px] text-gray-400 uppercase tracking-wider">{t('dashboard.manual_create_desc')}</p>
             </div>
-          </div>
+          </motion.button>
         </div>
       </section>
+
+      {/* AI Deck Creation Modal */}
+      <AnimatePresence>
+        {isAIModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setIsAIModalOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="glass w-full max-w-lg rounded-[32px] p-8 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white">
+                    <Sparkles size={20} />
+                  </div>
+                  <h2 className="text-xl font-bold">{t('dashboard.ai_generate')}</h2>
+                </div>
+                <button onClick={() => setIsAIModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2 block">
+                    {t('explore.learning_topic')}
+                  </label>
+                  <input
+                    type="text"
+                    value={aiTopic}
+                    onChange={(e) => setAiTopic(e.target.value)}
+                    placeholder={t('explore.topic_placeholder')}
+                    className="w-full glass px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2 block">
+                      {t('explore.target_language')}
+                    </label>
+                    <select
+                      value={aiTargetLang}
+                      onChange={(e) => setAiTargetLang(e.target.value)}
+                      className="w-full glass px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    >
+                      <option value="">{t('explore.select_language')}</option>
+                      {LANGUAGES.map((lang) => (
+                        <option key={lang.code} value={lang.code}>{lang.flag} {lang.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2 block">
+                      {t('explore.source_language')}
+                    </label>
+                    <select
+                      value={aiSourceLang}
+                      onChange={(e) => setAiSourceLang(e.target.value)}
+                      className="w-full glass px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    >
+                      {LANGUAGES.map((lang) => (
+                        <option key={lang.code} value={lang.code}>{lang.flag} {lang.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={aiIsPublic}
+                    onChange={(e) => setAiIsPublic(e.target.checked)}
+                    className="w-5 h-5 rounded accent-blue-500"
+                  />
+                  <span className="text-sm font-medium">{t('explore.make_public')}</span>
+                </label>
+
+                <button
+                  onClick={handleAIGenerate}
+                  disabled={!aiTopic || !aiTargetLang || isGeneratingAI}
+                  className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-4 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isGeneratingAI ? (
+                    <>
+                      <Loader2 className="animate-spin" size={20} />
+                      {t('explore.generating')}
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={20} />
+                      {t('explore.generate_deck')}
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Manual Deck Creation Modal */}
+      <AnimatePresence>
+        {isManualModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setIsManualModalOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="glass w-full max-w-2xl rounded-[32px] p-8 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-teal-600 flex items-center justify-center text-white">
+                    <Plus size={20} />
+                  </div>
+                  <h2 className="text-xl font-bold">{t('dashboard.manual_create')}</h2>
+                </div>
+                <button onClick={() => setIsManualModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2 block">
+                    {t('explore.deck_title')}
+                  </label>
+                  <input
+                    type="text"
+                    value={manualTitle}
+                    onChange={(e) => setManualTitle(e.target.value)}
+                    placeholder={t('explore.deck_title_placeholder')}
+                    className="w-full glass px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2 block">
+                      {t('explore.target_language')}
+                    </label>
+                    <select
+                      value={manualTargetLang}
+                      onChange={(e) => setManualTargetLang(e.target.value)}
+                      className="w-full glass px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                    >
+                      <option value="">{t('explore.select_language')}</option>
+                      {LANGUAGES.map((lang) => (
+                        <option key={lang.code} value={lang.code}>{lang.flag} {lang.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2 block">
+                      {t('explore.source_language')}
+                    </label>
+                    <select
+                      value={manualSourceLang}
+                      onChange={(e) => setManualSourceLang(e.target.value)}
+                      className="w-full glass px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                    >
+                      {LANGUAGES.map((lang) => (
+                        <option key={lang.code} value={lang.code}>{lang.flag} {lang.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Cards Section */}
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3 block">
+                    {t('explore.cards')} ({manualCards.length})
+                  </label>
+                  <div className="space-y-3 max-h-64 overflow-y-auto">
+                    {manualCards.map((card, i) => (
+                      <div key={i} className="glass p-4 rounded-xl space-y-2">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={card.word}
+                            onChange={(e) => updateManualCard(i, 'word', e.target.value)}
+                            placeholder={t('explore.word')}
+                            className="flex-1 glass px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                          />
+                          <input
+                            type="text"
+                            value={card.translation}
+                            onChange={(e) => updateManualCard(i, 'translation', e.target.value)}
+                            placeholder={t('explore.translation')}
+                            className="flex-1 glass px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                          />
+                          <select
+                            value={card.type}
+                            onChange={(e) => updateManualCard(i, 'type', e.target.value)}
+                            className="glass px-2 py-2 rounded-lg text-sm focus:outline-none"
+                          >
+                            <option value="Noun">Noun</option>
+                            <option value="Verb">Verb</option>
+                            <option value="Adjective">Adj</option>
+                            <option value="Phrase">Phrase</option>
+                          </select>
+                          {manualCards.length > 1 && (
+                            <button
+                              onClick={() => removeManualCard(i)}
+                              className="text-red-400 hover:text-red-600 p-2"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          type="text"
+                          value={card.sample_sentence}
+                          onChange={(e) => updateManualCard(i, 'sample_sentence', e.target.value)}
+                          placeholder={t('explore.sample_sentence')}
+                          className="w-full glass px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={addManualCard}
+                    className="mt-3 w-full glass py-2 rounded-xl text-sm font-medium text-green-600 hover:bg-green-50 flex items-center justify-center gap-2"
+                  >
+                    <Plus size={16} />
+                    {t('explore.add_card')}
+                  </button>
+                </div>
+
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={manualIsPublic}
+                    onChange={(e) => setManualIsPublic(e.target.checked)}
+                    className="w-5 h-5 rounded accent-green-500"
+                  />
+                  <span className="text-sm font-medium">{t('explore.make_public')}</span>
+                </label>
+
+                <button
+                  onClick={handleManualCreate}
+                  disabled={!manualTitle || !manualTargetLang || isCreatingManual}
+                  className="w-full bg-gradient-to-r from-green-500 to-teal-600 text-white py-4 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isCreatingManual ? (
+                    <>
+                      <Loader2 className="animate-spin" size={20} />
+                      {t('explore.creating')}
+                    </>
+                  ) : (
+                    <>
+                      <Check size={20} />
+                      {t('explore.create_deck')}
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

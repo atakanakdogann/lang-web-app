@@ -13,8 +13,59 @@ export interface UserStats {
 export const profileService = {
     /**
      * Get user's learning statistics from the database
+     * Uses server-side RPC for scalability (no client-side data aggregation)
      */
     async getUserStats(userId: string): Promise<UserStats> {
+        try {
+            // Call the server-side RPC function for efficient stats calculation
+            const { data, error } = await supabase.rpc('get_user_stats', {
+                p_user_id: userId
+            });
+
+            if (error) {
+                console.error('RPC error, falling back to client-side calculation:', error);
+                // Fallback to client-side calculation if RPC fails
+                return this.getUserStatsClientSide(userId);
+            }
+
+            // Parse the response from RPC
+            const stats = data as {
+                totalCardsStudied: number;
+                totalDecksCompleted: number;
+                averageRating: number;
+                currentStreak: number;
+                longestStreak: number;
+                totalWordsLearned: number;
+                practiceHistory: { date: string; count: number }[];
+            };
+
+            return {
+                totalWordsLearned: stats.totalWordsLearned || 0,
+                totalDecksCompleted: stats.totalDecksCompleted || 0,
+                averageRating: stats.averageRating || 0,
+                currentStreak: stats.currentStreak || 0,
+                longestStreak: stats.longestStreak || 0,
+                totalCardsStudied: stats.totalCardsStudied || 0,
+                practiceHistory: stats.practiceHistory || [],
+            };
+        } catch (error) {
+            console.error('Error fetching user stats:', error);
+            return {
+                totalWordsLearned: 0,
+                totalDecksCompleted: 0,
+                averageRating: 0,
+                currentStreak: 0,
+                longestStreak: 0,
+                totalCardsStudied: 0,
+                practiceHistory: [],
+            };
+        }
+    },
+
+    /**
+     * Fallback: Get user stats client-side (slower, used if RPC unavailable)
+     */
+    async getUserStatsClientSide(userId: string): Promise<UserStats> {
         try {
             // Get all user's deck progress (for practice history and ratings)
             const { data: progressData, error: progressError } = await supabase
@@ -65,7 +116,7 @@ export const profileService = {
                 practiceHistory,
             };
         } catch (error) {
-            console.error('Error fetching user stats:', error);
+            console.error('Error in client-side stats calculation:', error);
             return {
                 totalWordsLearned: 0,
                 totalDecksCompleted: 0,
@@ -200,12 +251,21 @@ export const profileService = {
         }
     },
 
-    /**
-     * Update streak when user studies
-     * Called when a card is completed - updates streak based on last practice date
-     */
+    // Track last streak update to prevent race conditions within a session
+    _lastStreakUpdateDate: null as string | null,
+    _lastStreakUpdateUserId: null as string | null,
+
     async updateStreak(userId: string): Promise<void> {
         try {
+            // Get today's local date
+            const now = new Date();
+            const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+            // Prevent multiple updates in the same session
+            if (this._lastStreakUpdateDate === today && this._lastStreakUpdateUserId === userId) {
+                return;
+            }
+
             // Get current streak info
             const { data: profile, error: fetchError } = await supabase
                 .from('profiles')
@@ -215,40 +275,32 @@ export const profileService = {
 
             if (fetchError) throw fetchError;
 
-            const today = new Date().toISOString().split('T')[0];
-            const lastPractice = profile?.last_practice_date?.split('T')[0];
+            let lastPractice = profile?.last_practice_date;
+            if (lastPractice && lastPractice.includes('T')) {
+                lastPractice = lastPractice.split('T')[0];
+            }
             const currentStreak = profile?.streak_days || 0;
 
-            // If already practiced today AND streak is not 0, no update needed
+            // If already practiced today, mark as updated and skip
             if (lastPractice === today && currentStreak > 0) {
+                this._lastStreakUpdateDate = today;
+                this._lastStreakUpdateUserId = userId;
                 return;
             }
 
-            // If practiced today but streak is 0, fix it to 1
-            if (lastPractice === today && currentStreak === 0) {
-                const { error: updateError } = await supabase
-                    .from('profiles')
-                    .update({ streak_days: 1 })
-                    .eq('id', userId);
-                if (updateError) throw updateError;
-                return;
-            }
-
-            let newStreak = 1; // Default: start new streak
-
+            // Calculate new streak
+            let newStreak = 1;
             if (lastPractice) {
-                const yesterday = new Date();
+                const yesterday = new Date(now);
                 yesterday.setDate(yesterday.getDate() - 1);
-                const yesterdayStr = yesterday.toISOString().split('T')[0];
+                const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
 
                 if (lastPractice === yesterdayStr) {
-                    // Practiced yesterday, continue streak
                     newStreak = currentStreak + 1;
                 }
-                // If last practice was before yesterday, streak resets to 1
             }
 
-            // Update profile with new streak and last practice date
+            // Update streak and last practice date
             const { error: updateError } = await supabase
                 .from('profiles')
                 .update({
@@ -258,6 +310,10 @@ export const profileService = {
                 .eq('id', userId);
 
             if (updateError) throw updateError;
+
+            // Cache locally for this session
+            this._lastStreakUpdateDate = today;
+            this._lastStreakUpdateUserId = userId;
         } catch (error) {
             console.error('Error updating streak:', error);
         }

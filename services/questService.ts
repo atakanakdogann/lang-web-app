@@ -30,16 +30,22 @@ const WEEKLY_QUESTS = [
     { id: 'weekly_decks', title: 'Deck Master', description: 'Complete 1 full deck', target: 1, xp: 100 },
 ];
 
-// Get today's date in YYYY-MM-DD format
-const getToday = () => new Date().toISOString().split('T')[0];
+// Get today's date in YYYY-MM-DD format (local timezone)
+const getToday = () => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+};
 
-// Get the start of the current week (Monday)
+// Get the start of the current week (Monday) in local timezone
 const getWeekStart = () => {
     const now = new Date();
+    // Reset to start of day
+    now.setHours(0, 0, 0, 0);
     const day = now.getDay();
-    const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
+    // Monday is 1, Sunday is 0. If Sunday (0), we want to go back 6 days.
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
     const monday = new Date(now.setDate(diff));
-    return monday.toISOString().split('T')[0];
+    return `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
 };
 
 export const questService = {

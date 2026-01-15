@@ -84,9 +84,29 @@ export const deckStatsService = {
 
     /**
      * Increment clone count when a deck is cloned
+     * Uses atomic database operation to prevent race conditions
      */
     async incrementCloneCount(deckId: string): Promise<void> {
-        // First check if stats exist
+        try {
+            // Use atomic RPC function for thread-safe increment
+            const { error } = await supabase.rpc('increment_clone_count', {
+                p_deck_id: deckId
+            });
+
+            if (error) {
+                console.error('RPC error, falling back to manual increment:', error);
+                // Fallback to old method if RPC fails
+                await this.incrementCloneCountFallback(deckId);
+            }
+        } catch (error) {
+            console.error('Failed to increment clone count:', error);
+        }
+    },
+
+    /**
+     * Fallback: Non-atomic increment (used if RPC unavailable)
+     */
+    async incrementCloneCountFallback(deckId: string): Promise<void> {
         const existing = await this.getDeckStats(deckId);
 
         if (existing) {
