@@ -61,6 +61,12 @@ input, textarea, select {
   font-size: inherit;
 }
 
+/* Hide default password toggle in Edge/IE */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
+
 /* Images */
 img, svg {
   display: block;

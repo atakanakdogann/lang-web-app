@@ -63,7 +63,20 @@ const Profile: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState('');
+
+  // Close avatar menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (avatarMenuOpen && !target.closest('.avatar-menu-container')) {
+        setAvatarMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [avatarMenuOpen]);
 
   // Load stats on mount
   useEffect(() => {
@@ -263,8 +276,12 @@ const Profile: React.FC = () => {
     <div className="space-y-8 pb-20">
       {/* Header with Avatar */}
       <header className="flex flex-col items-center">
-        <div className="relative mb-6 group">
-          <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-white shadow-2xl bg-gradient-to-br from-purple-400 to-pink-500">
+        <div className="relative mb-6 avatar-menu-container">
+          {/* Clickable Avatar */}
+          <button
+            onClick={() => setAvatarMenuOpen(!avatarMenuOpen)}
+            className="w-28 h-28 rounded-full overflow-hidden border-4 border-white shadow-2xl bg-gradient-to-br from-purple-400 to-pink-500 cursor-pointer hover:scale-105 transition-transform focus:outline-none focus:ring-4 focus:ring-purple-300"
+          >
             {profile?.avatar_url ? (
               <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
             ) : (
@@ -272,26 +289,47 @@ const Profile: React.FC = () => {
                 {profile?.username?.[0]?.toUpperCase() || 'U'}
               </div>
             )}
-          </div>
+          </button>
 
-          {/* Upload Overlay */}
-          <label className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-            <Camera className="text-white" size={28} />
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleAvatarUpload}
-              disabled={uploadingAvatar}
-            />
-          </label>
-
-          {/* Animated Ring */}
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
-            className="absolute -inset-1 rounded-full border border-dashed border-purple-400/50"
-          />
+          {/* iOS-Style Popup Menu */}
+          <AnimatePresence>
+            {avatarMenuOpen && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: -10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                transition={{ duration: 0.15 }}
+                className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-56 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-200/50 overflow-hidden z-50"
+              >
+                {profile?.avatar_url && (
+                  <button
+                    onClick={() => {
+                      window.open(profile.avatar_url, '_blank');
+                      setAvatarMenuOpen(false);
+                    }}
+                    className="w-full px-4 py-3.5 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-3 transition-colors border-b border-gray-100"
+                  >
+                    <User size={18} className="text-gray-500" />
+                    <span className="font-medium">{t('profile.view_photo')}</span>
+                  </button>
+                )}
+                <label className="w-full px-4 py-3.5 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-3 transition-colors cursor-pointer">
+                  <Camera size={18} className="text-gray-500" />
+                  <span className="font-medium">{t('profile.change_photo')}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      handleAvatarUpload(e);
+                      setAvatarMenuOpen(false);
+                    }}
+                    disabled={uploadingAvatar}
+                  />
+                </label>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         <h1 className="text-2xl font-bold tracking-tight">{profile?.username || 'User'}</h1>
@@ -420,10 +458,10 @@ const Profile: React.FC = () => {
                             animate={{ height: `${Math.max(heightPercent, 4)}%` }}
                             transition={{ duration: 0.5, delay: i * 0.05 }}
                             className={`w-full rounded-t-lg ${day.count === 0
-                                ? 'bg-gray-100'
-                                : isToday
-                                  ? 'bg-gradient-to-t from-blue-600 to-blue-400'
-                                  : 'bg-gradient-to-t from-blue-400 to-blue-300'
+                              ? 'bg-gray-100'
+                              : isToday
+                                ? 'bg-gradient-to-t from-blue-600 to-blue-400'
+                                : 'bg-gradient-to-t from-blue-400 to-blue-300'
                               }`}
                             style={{ minHeight: day.count === 0 ? '4px' : undefined }}
                           />

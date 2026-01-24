@@ -201,6 +201,7 @@ const translations: Record<string, Record<string, string>> = {
         // Form Fields
         'profile.username': "Username",
         'profile.upload_photo': "Upload Photo",
+        'profile.view_photo': "View Photo",
         'profile.change_photo': "Change Photo",
         'profile.remove_photo': "Remove Photo",
         'profile.photo_removed': "Photo removed successfully",
@@ -476,6 +477,7 @@ const translations: Record<string, Record<string, string>> = {
         // Form Fields
         'profile.username': "Kullanıcı Adı",
         'profile.upload_photo': "Fotoğraf Yükle",
+        'profile.view_photo': "Fotoğrafı Görüntüle",
         'profile.change_photo': "Fotoğrafı Değiştir",
         'profile.remove_photo': "Fotoğrafı Kaldır",
         'profile.photo_removed': "Fotoğraf başarıyla kaldırıldı",
