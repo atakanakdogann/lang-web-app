@@ -1,6 +1,6 @@
 {
-    "name": "LingoCards",
-    "short_name": "LingoCards",
+    "name": "Claus",
+    "short_name": "Claus",
     "description": "AI-powered language learning through sentence writing. Learn vocabulary by writing real sentences with instant AI feedback.",
     "start_url": "/",
     "display": "standalone",

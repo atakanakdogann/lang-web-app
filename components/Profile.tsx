@@ -65,6 +65,8 @@ const Profile: React.FC = () => {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, -1 = last week, etc.
+  const [weekModalOpen, setWeekModalOpen] = useState(false);
 
   // Close avatar menu when clicking outside
   useEffect(() => {
@@ -410,31 +412,75 @@ const Profile: React.FC = () => {
               />
             </section>
 
-            {/* 7-Day Activity Chart (Apple Health Style) */}
+            {/* Weekly Activity Chart (Monday-Sunday) */}
             <section className="glass p-8 rounded-[32px]">
-              <div className="flex justify-between items-center mb-6">
+              {/* Header with Week Navigation */}
+              <div className="flex justify-between items-center mb-2">
                 <h2 className="font-bold text-lg">{t('profile.learning_consistency')}</h2>
-                <span className="text-xs text-gray-400 font-bold uppercase tracking-widest">{t('profile.last_7_days')}</span>
+                <span className="text-xs text-gray-400 font-bold uppercase tracking-widest">
+                  {weekOffset === 0 ? t('profile.this_week') : t('profile.last_week')}
+                </span>
               </div>
 
-              {/* Bar Chart */}
+              {/* Date Range with Navigation Arrows */}
+              <div className="flex items-center justify-between mb-6">
+                <button
+                  onClick={() => setWeekOffset(prev => prev - 1)}
+                  className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
+                >
+                  <ChevronRight size={20} className="rotate-180 text-gray-400" />
+                </button>
+
+                <p className="text-sm font-medium text-gray-600">
+                  {(() => {
+                    const today = new Date();
+                    const dayOfWeek = today.getDay();
+                    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                    const monday = new Date(today);
+                    monday.setDate(today.getDate() - daysFromMonday + (weekOffset * 7));
+                    const sunday = new Date(monday);
+                    sunday.setDate(monday.getDate() + 6);
+
+                    const formatDate = (d: Date) => d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+                    return `${formatDate(monday)} – ${formatDate(sunday)}`;
+                  })()}
+                </p>
+
+                <button
+                  onClick={() => setWeekOffset(prev => Math.min(prev + 1, 0))}
+                  disabled={weekOffset >= 0}
+                  className="p-2 rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight size={20} className="text-gray-400" />
+                </button>
+              </div>
+
+              {/* Bar Chart - Monday to Sunday */}
               <div className="flex items-end justify-between gap-2 h-32 mb-4">
                 {(() => {
-                  // Get last 7 days from practiceHistory
+                  // Get Monday of the selected week
                   const today = new Date();
-                  const last7Days = Array.from({ length: 7 }, (_, i) => {
-                    const date = new Date(today);
-                    date.setDate(date.getDate() - (6 - i));
+                  const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+                  const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                  const monday = new Date(today);
+                  monday.setDate(today.getDate() - daysFromMonday + (weekOffset * 7));
+
+                  // Generate Mon-Sun for the selected week
+                  const weekDays = Array.from({ length: 7 }, (_, i) => {
+                    const date = new Date(monday);
+                    date.setDate(monday.getDate() + i);
                     return date.toISOString().split('T')[0];
                   });
 
                   // Get counts for each day
-                  const dayData = last7Days.map(dateStr => {
+                  const dayData = weekDays.map((dateStr, idx) => {
                     const entry = stats?.practiceHistory?.find(h => h.date === dateStr);
+                    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
                     return {
                       date: dateStr,
                       count: entry?.count || 0,
-                      dayName: new Date(dateStr).toLocaleDateString('en-US', { weekday: 'short' })
+                      dayName: dayNames[idx],
+                      isToday: dateStr === today.toISOString().split('T')[0]
                     };
                   });
 
@@ -443,7 +489,6 @@ const Profile: React.FC = () => {
 
                   return dayData.map((day, i) => {
                     const heightPercent = (day.count / maxCount) * 100;
-                    const isToday = i === 6;
 
                     return (
                       <div key={day.date} className="flex-1 flex flex-col items-center gap-2">
@@ -459,7 +504,7 @@ const Profile: React.FC = () => {
                             transition={{ duration: 0.5, delay: i * 0.05 }}
                             className={`w-full rounded-t-lg ${day.count === 0
                               ? 'bg-gray-100'
-                              : isToday
+                              : day.isToday
                                 ? 'bg-gradient-to-t from-blue-600 to-blue-400'
                                 : 'bg-gradient-to-t from-blue-400 to-blue-300'
                               }`}
@@ -467,7 +512,7 @@ const Profile: React.FC = () => {
                           />
                         </div>
                         {/* Day label */}
-                        <span className={`text-xs font-medium ${isToday ? 'text-blue-600' : 'text-gray-400'}`}>
+                        <span className={`text-xs font-medium ${day.isToday ? 'text-blue-600' : 'text-gray-400'}`}>
                           {day.dayName}
                         </span>
                       </div>
@@ -480,18 +525,137 @@ const Profile: React.FC = () => {
               <div className="flex justify-between items-center pt-4 border-t border-gray-100">
                 <div>
                   <p className="text-2xl font-bold text-gray-900">
-                    {stats?.practiceHistory?.slice(-7).reduce((sum, h) => sum + h.count, 0) || 0}
+                    {(() => {
+                      const today = new Date();
+                      const dayOfWeek = today.getDay();
+                      const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                      const monday = new Date(today);
+                      monday.setDate(today.getDate() - daysFromMonday + (weekOffset * 7));
+
+                      const weekDays = Array.from({ length: 7 }, (_, i) => {
+                        const date = new Date(monday);
+                        date.setDate(monday.getDate() + i);
+                        return date.toISOString().split('T')[0];
+                      });
+
+                      return weekDays.reduce((sum, dateStr) => {
+                        const entry = stats?.practiceHistory?.find(h => h.date === dateStr);
+                        return sum + (entry?.count || 0);
+                      }, 0);
+                    })()}
                   </p>
                   <p className="text-xs text-gray-400 uppercase tracking-wider">{t('profile.cards_this_week')}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-2xl font-bold text-blue-600">
-                    {stats?.practiceHistory?.slice(-7).filter(h => h.count > 0).length || 0}/7
+                    {(() => {
+                      const today = new Date();
+                      const dayOfWeek = today.getDay();
+                      const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                      const monday = new Date(today);
+                      monday.setDate(today.getDate() - daysFromMonday + (weekOffset * 7));
+
+                      const weekDays = Array.from({ length: 7 }, (_, i) => {
+                        const date = new Date(monday);
+                        date.setDate(monday.getDate() + i);
+                        return date.toISOString().split('T')[0];
+                      });
+
+                      return weekDays.filter(dateStr => {
+                        const entry = stats?.practiceHistory?.find(h => h.date === dateStr);
+                        return entry && entry.count > 0;
+                      }).length;
+                    })()}/7
                   </p>
                   <p className="text-xs text-gray-400 uppercase tracking-wider">{t('profile.days_active')}</p>
                 </div>
               </div>
             </section>
+
+            {/* Week Navigation Modal */}
+            <AnimatePresence>
+              {weekModalOpen && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                  onClick={() => setWeekModalOpen(false)}
+                >
+                  <motion.div
+                    initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                    exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                    transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-white rounded-[28px] p-6 w-full max-w-sm shadow-2xl"
+                  >
+                    <h3 className="text-lg font-bold text-center mb-4">{t('profile.select_week')}</h3>
+
+                    {/* Week Navigator */}
+                    <div className="flex items-center justify-between mb-6">
+                      <button
+                        onClick={() => setWeekOffset(prev => prev - 1)}
+                        className="p-3 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors"
+                      >
+                        <ChevronRight size={20} className="rotate-180 text-gray-600" />
+                      </button>
+
+                      <div className="text-center">
+                        <p className="text-sm font-medium text-gray-500">
+                          {(() => {
+                            const today = new Date();
+                            const dayOfWeek = today.getDay();
+                            const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                            const monday = new Date(today);
+                            monday.setDate(today.getDate() - daysFromMonday + (weekOffset * 7));
+                            const sunday = new Date(monday);
+                            sunday.setDate(monday.getDate() + 6);
+
+                            const formatDate = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                            return `${formatDate(monday)} - ${formatDate(sunday)}`;
+                          })()}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {weekOffset === 0 ? t('profile.current_week') : `${Math.abs(weekOffset)} ${t('profile.weeks_ago')}`}
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={() => setWeekOffset(prev => Math.min(prev + 1, 0))}
+                        disabled={weekOffset >= 0}
+                        className="p-3 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <ChevronRight size={20} className="text-gray-600" />
+                      </button>
+                    </div>
+
+                    {/* Quick Select */}
+                    <div className="grid grid-cols-2 gap-2 mb-4">
+                      <button
+                        onClick={() => { setWeekOffset(0); setWeekModalOpen(false); }}
+                        className={`p-3 rounded-xl text-sm font-medium transition-colors ${weekOffset === 0 ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                      >
+                        {t('profile.this_week')}
+                      </button>
+                      <button
+                        onClick={() => { setWeekOffset(-1); setWeekModalOpen(false); }}
+                        className={`p-3 rounded-xl text-sm font-medium transition-colors ${weekOffset === -1 ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                      >
+                        {t('profile.last_week')}
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={() => setWeekModalOpen(false)}
+                      className="w-full py-3 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-medium text-gray-700 transition-colors"
+                    >
+                      {t('profile.done')}
+                    </button>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Language Summary */}
             <section className="glass p-8 rounded-[32px]">

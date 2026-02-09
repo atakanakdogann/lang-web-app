@@ -127,7 +127,7 @@ const translations: Record<string, Record<string, string>> = {
         'explore.ai_generate': "AI Generate",
         'explore.create_manually': "Create Manually",
         'explore.custom_deck_ai': "Custom Deck AI",
-        'explore.tell_aura': "Tell Aura what you want to learn today.",
+        'explore.tell_claus': "Tell Claus what you want to learn today.",
         'explore.learning_topic': "Learning Topic",
         'explore.topic_placeholder': "e.g. Scuba Diving vocabulary",
         'explore.target_language': "Target Language",
@@ -183,6 +183,12 @@ const translations: Record<string, Record<string, string>> = {
         'profile.less': "Less",
         'profile.more': "More",
         'profile.your_journey': "Your Language Journey",
+        'profile.this_week': "This Week",
+        'profile.last_week': "Last Week",
+        'profile.weeks_ago': "weeks ago",
+        'profile.select_week': "Select Week",
+        'profile.current_week': "Current week",
+        'profile.done': "Done",
 
         // Settings Menu
         'profile.menu_profile': "Profile",
@@ -403,7 +409,7 @@ const translations: Record<string, Record<string, string>> = {
         'explore.ai_generate': "AI ile Oluştur",
         'explore.create_manually': "Manuel Oluştur",
         'explore.custom_deck_ai': "Özel Deste AI",
-        'explore.tell_aura': "Aura'ya bugün ne öğrenmek istediğinizi söyleyin.",
+        'explore.tell_claus': "Claus'a bugün ne öğrenmek istediğinizi söyleyin.",
         'explore.learning_topic': "Öğrenme Konusu",
         'explore.topic_placeholder': "örn. Dalış kelime bilgisi",
         'explore.target_language': "Hedef Dil",
@@ -459,6 +465,12 @@ const translations: Record<string, Record<string, string>> = {
         'profile.less': "Az",
         'profile.more': "Çok",
         'profile.your_journey': "Dil Yolculuğunuz",
+        'profile.this_week': "Bu Hafta",
+        'profile.last_week': "Geçen Hafta",
+        'profile.weeks_ago': "hafta önce",
+        'profile.select_week': "Hafta Seç",
+        'profile.current_week': "Mevcut hafta",
+        'profile.done': "Tamam",
 
         // Settings Menu
         'profile.menu_profile': "Profil",

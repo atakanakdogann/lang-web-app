@@ -74,13 +74,24 @@ export const analyzeSentence = async (
       },
     });
 
+    // Defensive check: ensure response.text exists and is valid
+    if (!response.text || response.text.trim() === '') {
+      console.warn("Gemini returned empty response");
+      return {
+        isCorrect: false,
+        correction: correctSentence,
+        explanation: "AI returned an empty response. Please try again.",
+        rating: 0
+      };
+    }
+
     return JSON.parse(response.text);
   } catch (error) {
     console.error("Analysis failed:", error);
     return {
       isCorrect: false,
       correction: correctSentence,
-      explanation: "Connectivity issue with the AI agent. Please try again.",
+      explanation: "Could not analyze your sentence. Please try again.",
       rating: 0
     };
   }

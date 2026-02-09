@@ -579,59 +579,74 @@ const Dashboard: React.FC<DashboardProps> = ({ decks, onStartDeck, onAddDeck, is
             {decks.map((deck) => (
               <motion.div
                 key={deck.id}
-                whileHover={{ y: -4 }}
-                className="group relative h-48 rounded-[32px] overflow-hidden cursor-pointer shadow-lg"
+                whileHover={{ y: -4, scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="group relative h-52 rounded-[28px] overflow-hidden cursor-pointer"
+                style={{
+                  background: deck.gradient,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.15), 0 12px 40px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.2)'
+                }}
                 onClick={() => onStartDeck(deck)}
               >
-                {/* Abstract Gradient Background */}
-                <div
-                  className="absolute inset-0 transition-transform duration-500 group-hover:scale-110"
-                  style={{ background: deck.gradient }}
-                />
+                {/* Overlay for depth */}
+                <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/30" />
 
-                <div className="absolute inset-0 bg-black/10 transition-colors group-hover:bg-black/20" />
+                {/* Hover overlay */}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
 
-                <div className="relative h-full p-8 flex flex-col justify-between text-white">
+                <div className="relative h-full p-6 flex flex-col justify-between text-white">
+                  {/* Top Section - Badges */}
                   <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-80">
-                        {LANGUAGES.find(l => l.code === deck.source_lang)?.flag || '🌐'} → {LANGUAGES.find(l => l.code === deck.target_lang)?.flag || '🌐'} {deck.language}
-                      </span>
+                    <div className="flex items-center gap-2 mb-3">
+                      {/* Language Badge */}
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/20 backdrop-blur-md rounded-lg">
+                        <span className="text-xs">{LANGUAGES.find(l => l.code === deck.source_lang)?.flag || '🌐'}</span>
+                        <span className="text-[10px] opacity-60">→</span>
+                        <span className="text-xs">{LANGUAGES.find(l => l.code === deck.target_lang)?.flag || '🌐'}</span>
+                        <span className="text-[10px] font-semibold uppercase tracking-wide">{deck.language}</span>
+                      </div>
+                      {/* Level Badge */}
                       {deck.level && (
-                        <span className="px-2 py-0.5 bg-white/20 backdrop-blur-sm rounded-full text-[9px] font-bold">
-                          {deck.level}
+                        <div className="px-2.5 py-1 bg-white/20 backdrop-blur-md rounded-lg">
+                          <span className="text-[10px] font-bold">{deck.level}</span>
+                        </div>
+                      )}
+                    </div>
+                    {/* Title */}
+                    <h3 className="text-xl font-bold tracking-tight drop-shadow-sm">{deck.title}</h3>
+                  </div>
+
+                  {/* Bottom Section - Progress */}
+                  <div className="space-y-3">
+                    {/* Progress bar */}
+                    <div className="h-1 w-full bg-white/20 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${deck.progress || 0}%` }}
+                        transition={{ duration: 0.8, ease: "easeOut" }}
+                        className="h-full bg-white rounded-full"
+                        style={{ boxShadow: '0 0 8px rgba(255,255,255,0.5)' }}
+                      />
+                    </div>
+                    {/* Stats row */}
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-medium opacity-80">
+                        {deck.cardsStudied || 0}/{deck.cards?.length || 0} cards
+                      </span>
+                      {deck.averageRating && deck.averageRating > 0 && (
+                        <span className="flex items-center gap-1 text-xs font-medium opacity-80">
+                          <svg className="w-3.5 h-3.5 text-yellow-300" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                          {deck.averageRating.toFixed(1)}
                         </span>
                       )}
                     </div>
-                    <h3 className="text-2xl font-bold tracking-tight">{deck.title}</h3>
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 mr-4">
-                      {/* Progress bar */}
-                      <div className="h-1.5 w-full bg-white/20 rounded-full overflow-hidden mb-2">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${deck.progress || 0}%` }}
-                          className="h-full bg-white"
-                        />
-                      </div>
-                      {/* Stats row */}
-                      <div className="flex justify-between items-center text-[10px] text-white/70">
-                        <span>{deck.cardsStudied || 0}/{deck.cards?.length || 0} cards</span>
-                        {deck.averageRating && deck.averageRating > 0 && (
-                          <span className="flex items-center gap-1">
-                            <svg className="w-3 h-3 text-yellow-300" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                            </svg>
-                            {deck.averageRating.toFixed(1)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Play size={20} fill="white" />
-                    </div>
+                  {/* Play button on hover */}
+                  <div className="absolute bottom-6 right-6 w-10 h-10 rounded-full bg-white/25 backdrop-blur-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 transform group-hover:scale-110">
+                    <Play size={18} fill="white" className="ml-0.5" />
                   </div>
                 </div>
               </motion.div>
