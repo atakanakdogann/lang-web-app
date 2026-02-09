@@ -1,76 +1,56 @@
-# 🌍 Lang Web App
+# Claus
 
-A modern language learning web application with AI-powered sentence analysis, vocabulary decks, and progress tracking.
+**AI-Powered Language Learning Platform**
 
-## ✨ Features
+Claus is a modern language learning application that leverages artificial intelligence to deliver personalized vocabulary training and real-time sentence analysis. Built for learners at every proficiency level, from beginner to advanced.
 
-- **🎯 CEFR-Based Learning** - Personalized content for levels A1 to C2
-- **🤖 AI Sentence Analysis** - Get feedback on your sentences in your native language
-- **⭐ Star Rating System** - Track your progress with 1-5 star ratings
-- **📚 Vocabulary Decks** - Create and study custom flashcard decks
-- **🌐 Multi-Language Support** - Learn 12+ languages
-- **📊 Progress Tracking** - Visual progress bars and statistics
+---
 
-## 🚀 Getting Started
+## Overview
 
-### Prerequisites
-- Node.js 18+
-- Supabase account
+Claus combines intelligent flashcard decks with AI-driven feedback to create an effective language learning experience. Users can generate custom vocabulary decks instantly, practice with fill-in-the-blank exercises, and receive detailed analysis of their responses.
+
+### Key Capabilities
+
+- **AI Deck Generation** — Create tailored vocabulary decks on any topic in seconds
+- **Intelligent Feedback** — Real-time sentence analysis with corrections and explanations
+- **CEFR Alignment** — Content structured across A1 to C2 proficiency levels
+- **Progress Analytics** — Comprehensive tracking of learning streaks and mastery
+- **Community Library** — Access to shared decks from learners worldwide
+- **Multi-Language Support** — 12+ languages available
+
+---
+
+## Technology
+
+| Layer | Stack |
+|-------|-------|
+| Frontend | React 19, TypeScript, Vite |
+| Styling | CSS with Glassmorphism Design |
+| Animation | Framer Motion |
+| Backend | Supabase (Auth, Database, Storage) |
+| AI Engine | Google Gemini API |
+
+---
+
+## Requirements
+
+- Node.js 18 or higher
+- Supabase project
 - Google Gemini API key
 
-### Installation
+---
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/lang-web-app.git
-   cd lang-web-app
-   ```
+## Deployment
 
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+For deployment and configuration details, please contact the development team.
 
-3. Set up environment variables:
-   ```bash
-   cp .env.example .env.local
-   ```
-   Then edit `.env.local` with your credentials.
+---
 
-4. Set up Supabase:
-   - Create a new Supabase project
-   - Run the SQL files in order:
-     - `supabase-schema.sql`
-     - `supabase-migration-profiles.sql`
-     - `supabase-migration-language.sql`
-     - `supabase-migration-progress.sql`
+## License
 
-5. Run the development server:
-   ```bash
-   npm run dev
-   ```
+Proprietary. All rights reserved.
 
-## 🛠️ Tech Stack
+---
 
-- **Frontend:** React 19, TypeScript, Vite
-- **Styling:** Vanilla CSS with Glassmorphism
-- **Animation:** Framer Motion
-- **Backend:** Supabase (Auth, Database, Storage)
-- **AI:** Google Gemini API
-- **Icons:** Lucide React
-
-## 📁 Project Structure
-
-```
-lang-web-app/
-├── components/       # React components
-├── services/         # API services (Supabase, Gemini)
-├── contexts/         # React contexts (Auth)
-├── types.ts          # TypeScript types
-├── App.tsx           # Main app component
-└── supabase-*.sql    # Database migrations
-```
-
-## 📝 License
-
-MIT License - feel free to use this project for learning or building your own apps!
+© 2025 Claus
